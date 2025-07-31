@@ -24,9 +24,8 @@ class Perusahaan extends Authenticatable implements JWTSubject
         'alamat',
         'kontak',
         'logo_perusahaan',
-        'tanggal_verifikasi',
-        'divisi_penempatan',
-        'mentor',
+        'penanggung_jawab',
+        'web_perusahaan',
         'otp',
         'otp_expired_at',
     ];

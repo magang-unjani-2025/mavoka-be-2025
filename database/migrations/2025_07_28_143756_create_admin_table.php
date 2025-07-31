@@ -15,9 +15,6 @@ return new class extends Migration
             $table->id();
             $table->string('username')->unique();
             $table->string('password');
-            $table->string('nama_lengkap');
-            $table->string('kontak');
-            $table->string('foto_profil')->nullable();
             $table->timestamps();
         });
     }

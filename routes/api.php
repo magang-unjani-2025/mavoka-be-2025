@@ -14,6 +14,7 @@ Route::prefix('user')->group(function () {
     Route::post('/logout', [LoginController::class, 'logout']);
 
     Route::post('/register/siswa', [AuthController::class, 'registerSiswa']);
+    Route::post('/siswa/lengkapi-registrasi', [AuthController::class, 'siswaLengkapiRegistrasi']);
     Route::post('/register/sekolah', [AuthController::class, 'registerSekolah']);
     Route::post('/register/perusahaan', [AuthController::class, 'registerPerusahaan']);
     Route::post('/register/lpk', [AuthController::class, 'registerLembagaPelatihan']);
@@ -24,7 +25,7 @@ Route::prefix('user')->group(function () {
     Route::middleware('auth:perusahaan')->put('/update-akun/{role}/{id}', [AuthController::class, 'updateAccount']);
     Route::middleware('auth:lpk')->put('/update-akun/{role}/{id}', [AuthController::class, 'updateAccount']);
 
-    Route::get('/show-akun/{role}', [AuthController::class, 'getAllAccounts']);
+    Route::middleware('auth:admin')->get('/show-akun/{role}', [AuthController::class, 'getAllAccounts']);
     Route::delete('/delete-akun/{role}/{id}', [AuthController::class, 'deleteAccount']);
 });
 

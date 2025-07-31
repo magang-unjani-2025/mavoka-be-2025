@@ -21,8 +21,8 @@ return new class extends Migration
             $table->string('nama_sekolah');
             $table->string('web_sekolah');
             $table->string('npsn')->unique();
-            $table->string('kontak');
-            $table->text('alamat');
+            $table->string('kontak')->nullable();
+            $table->text('alamat')->nullable();
             $table->string('otp')->nullable();
             $table->timestamp('otp_expired_at')->nullable();
             $table->timestamps();

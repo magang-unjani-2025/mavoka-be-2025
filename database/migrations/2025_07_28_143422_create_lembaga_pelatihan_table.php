@@ -20,11 +20,13 @@ return new class extends Migration
             $table->dateTime('tanggal_verifikasi')->nullable();
             $table->string('nama_lembaga');
             $table->string('bidang_pelatihan');
-            $table->string('deskripsi_lembaga');
-            $table->string('alamat');
-            $table->string('kontak');
+            $table->string('deskripsi_lembaga')->nullable();
+            $table->string('web_lembaga')->nullable();
+            $table->string('alamat')->nullable();
+            $table->string('kontak')->nullable();
             $table->string('logo_lembaga')->nullable();
-            $table->string('status_akreditasi');
+            $table->string('dokumen_akreditasi')->nullable();
+            $table->string('status_akreditasi')->nullable();
             $table->string('otp')->nullable();
             $table->timestamp('otp_expired_at')->nullable();
 

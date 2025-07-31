@@ -16,9 +16,6 @@ class AdminSeeder extends Seeder
         DB::table('admin')->insert([
             'username' => 'admin',
             'password' => Hash::make('admin123'),
-            'nama_lengkap' => 'Minvo',
-            'kontak' => '08123456789',
-            'foto_profil' => null,
             'created_at' => now(),
             'updated_at' => now(),
         ]);

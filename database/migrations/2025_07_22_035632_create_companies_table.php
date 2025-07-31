@@ -20,12 +20,12 @@ return new class extends Migration
             $table->dateTime('tanggal_verifikasi')->nullable();
             $table->string('nama_perusahaan');
             $table->string('bidang_usaha');
-            $table->string('deskripsi_usaha');
-            $table->text('alamat');
-            $table->string('kontak');
+            $table->string('web_perusahaan');
+            $table->string('deskripsi_usaha')->nullable();
+            $table->text('alamat')->nullable();
+            $table->string('kontak')->nullable();
             $table->string('logo_perusahaan')->nullable();
-            $table->string('divisi_penempatan');
-            $table->string('mentor')->nullable();
+            $table->string('penanggung_jawab')->nullable();
             $table->string('otp')->nullable();
             $table->timestamp('otp_expired_at')->nullable();
 

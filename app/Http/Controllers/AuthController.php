@@ -2,11 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use Illuminate\Support\Facades\Auth;
 use App\Models\Siswa;
 use App\Models\Sekolah;
 use App\Models\Perusahaan;
 use App\Models\LembagaPelatihan;
-use App\Models\Jurusan;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
@@ -90,60 +90,6 @@ class AuthController extends Controller
     }
 
 
-    // Register Siswa
-    public function registerSiswa(Request $request)
-    {
-        $validator = Validator::make($request->all(), [
-            'username' => 'required|unique:siswa',
-            'email' => 'required|email|unique:siswa',
-            'password' => 'required|min:6',
-            'nama_lengkap' => 'required',
-            'nisn' => 'required|unique:siswa',
-            'kelas' => 'required|integer',
-            'jurusan_id' => 'required|exists:jurusan,id',
-            'tahun_ajaran' => 'required|integer',
-            'tanggal_lahir' => 'required|date',
-            'jenis_kelamin' => 'required',
-            'alamat' => 'required',
-            'kontak' => 'required',
-            'status_siswa' => 'required',
-            'sekolah_id' => 'required|exists:sekolah,id',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json($validator->errors(), 422);
-        }
-
-        $otp = random_int(100000, 999999);
-
-        $siswa = Siswa::create([
-            'username' => $request->username,
-            'email' => $request->email,
-            'password' => Hash::make($request->password),
-            'nama_lengkap' => $request->nama_lengkap,
-            'nisn' => $request->nisn,
-            'kelas' => $request->kelas,
-            'jurusan_id' => $request->jurusan_id,
-            'tahun_ajaran' => $request->tahun_ajaran,
-            'tanggal_lahir' => $request->tanggal_lahir,
-            'jenis_kelamin' => $request->jenis_kelamin,
-            'alamat' => $request->alamat,
-            'kontak' => $request->kontak,
-            'status_siswa' => $request->status_siswa,
-            'sekolah_id' => $request->sekolah_id,
-            'status_verifikasi' => 'belum',
-            'tanggal_verifikasi' => null,
-            'otp' => $otp,
-            'otp_expired_at' => now()->addMinutes(10),
-        ]);
-
-        $this->sendOtpEmail($request->email, $otp);
-
-        return response()->json([
-            'message' => 'Registrasi siswa berhasil. Cek email untuk OTP.',
-            'data' => $siswa
-        ]);
-    }
 
     // Register Sekolah
     public function registerSekolah(Request $request)
@@ -154,8 +100,7 @@ class AuthController extends Controller
             'password' => 'required|min:6',
             'nama_sekolah' => 'required',
             'npsn' => 'required|unique:sekolah',
-            'kontak' => 'required',
-            'alamat' => 'required',
+            'web_sekolah' => 'required',
         ]);
 
         if ($validator->fails()) {
@@ -187,6 +132,74 @@ class AuthController extends Controller
         ]);
     }
 
+    // Register Siswa
+    public function registerSiswa(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'nisn' => 'required|unique:siswa',
+            'sekolah_id' => 'required|exists:sekolah,id',
+            'kelas' => 'required|integer',
+            'jurusan_id' => 'required|exists:jurusan,id',
+            'tahun_ajaran' => 'required|integer',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json($validator->errors(), 422);
+        }
+
+        $siswa = Siswa::create([
+            'nisn' => $request->nisn,
+            'sekolah_id' => $request->sekolah_id,
+            'kelas' => $request->kelas,
+            'jurusan_id' => $request->jurusan_id,
+            'tahun_ajaran' => $request->tahun_ajaran,
+            'status_verifikasi' => 'belum',
+        ]);
+
+        return response()->json([
+            'message' => 'Registrasi siswa berhasil. Cek email untuk OTP.',
+            'data' => $siswa
+        ]);
+    }
+
+    // Lengkapi Data Siswa (Register Siswa)
+    public function siswaLengkapiRegistrasi(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'nisn' => 'required|exists:siswa,nisn',
+            'sekolah_id' => 'required|exists:sekolah,id',
+            'username' => 'required|unique:siswa,username',
+            'email' => 'required|email|unique:siswa,email',
+            'password' => 'required|min:6',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json($validator->errors(), 422);
+        }
+
+        $otp = random_int(100000, 999999);
+
+        $siswa = Siswa::where('nisn', $request->nisn)->first();
+
+        $siswa->update([
+            'username' => $request->username,
+            'email' => $request->email,
+            'password' => Hash::make($request->password),
+            'status_verifikasi' => 'belum',
+            'tanggal_verifikasi' => null,
+            'otp' => $otp,
+            'otp_expired_at' => now()->addMinutes(10),
+        ]);
+
+        $this->sendOtpEmail($request->email, $otp);
+
+        return response()->json([
+            'message' => 'Data siswa berhasil diperbarui. Cek email untuk OTP.',
+            'data' => $siswa
+        ]);
+    }
+
+
     // Register Perusahaan
     public function registerPerusahaan(Request $request)
     {
@@ -196,10 +209,7 @@ class AuthController extends Controller
             'password' => 'required|min:6',
             'nama_perusahaan' => 'required',
             'bidang_usaha' => 'required',
-            'deskripsi_usaha' => 'required',
-            'alamat' => 'required',
-            'kontak' => 'required',
-            'divisi_penempatan' => 'required',
+            'web_perusahaan' => 'required',
         ]);
 
         if ($validator->fails()) {
@@ -215,11 +225,12 @@ class AuthController extends Controller
             'password' => Hash::make($request->password),
             'nama_perusahaan' => $request->nama_perusahaan,
             'bidang_usaha' => $request->bidang_usaha,
+            'web_perusahaan' => $request->web_perusahaan,
             'deskripsi_usaha' => $request->deskripsi_usaha,
             'alamat' => $request->alamat,
             'kontak' => $request->kontak,
             'divisi_penempatan' => $request->divisi_penempatan,
-            'mentor' => $request->mentor ?? null,
+            'penanggung_jawab' => $request->penanggung_jawab ?? null,
             'logo_perusahaan' => $request->logo_perusahaan ?? null,
             'status_verifikasi' => 'belum',
             'tanggal_verifikasi' => null,
@@ -245,10 +256,7 @@ class AuthController extends Controller
             'password' => 'required|min:6',
             'nama_lembaga' => 'required',
             'bidang_pelatihan' => 'required',
-            'deskripsi_lembaga' => 'required',
-            'alamat' => 'required',
-            'kontak' => 'required',
-            'status_akreditasi' => 'required',
+            'web_lembaga' => 'required',
         ]);
 
         if ($validator->fails()) {
@@ -280,6 +288,7 @@ class AuthController extends Controller
             'data' => $lembaga
         ]);
     }
+
 
     // Edit Akun
     public function updateAccount(Request $request, $role, $id)
@@ -314,10 +323,10 @@ class AuthController extends Controller
 
         // Daftar field yang boleh diupdate berdasarkan role
         $allowedFields = match ($role) {
-            'siswa' => ['nama_lengkap', 'username', 'email', 'nomor_hp', 'jenis_kelamin', 'alamat'],
-            'sekolah' => ['nama_sekolah', 'npsn', 'alamat', 'email', 'kontak', 'username'],
-            'perusahaan' => ['nama_perusahaan', 'alamat', 'email', 'kontak', 'website', 'username'],
-            'lpk' => ['nama_lembaga', 'alamat', 'email', 'kontak', 'website', 'username'],
+            'sekolah' => ['username', 'password', 'alamat', 'kontak'],
+            'siswa' => ['username', 'password', 'tanggal_lahir', 'alamat', 'kontak', 'jenis_kelamin', 'foto_profil'],
+            'perusahaan' => ['username', 'password', 'deskripsi_usaha', 'alamat', 'kontak', 'logo_perusahaan', 'penanggung_jawab'],
+            'lpk' => ['username', 'password', 'deskripsi_lembaga', 'alamat', 'kontak', 'logo_lembaga', 'status_akreditasi', 'dokumen_akreditasi'],
         };
 
         $data = $request->only($allowedFields);
@@ -333,22 +342,45 @@ class AuthController extends Controller
 
 
     // Tampil Semua Akun
-    public function getAllAccounts($role)
-    {
-        $model = match ($role) {
-            'siswa' => Siswa::class,
-            'sekolah' => Sekolah::class,
-            'perusahaan' => Perusahaan::class,
-            'lpk' => LembagaPelatihan::class,
-            default => null,
-        };
+    // public function getAllAccounts($role)
+    // {
+    //     $model = match ($role) {
+    //         'siswa' => Siswa::class,
+    //         'sekolah' => Sekolah::class,
+    //         'perusahaan' => Perusahaan::class,
+    //         'lpk' => LembagaPelatihan::class,
+    //         default => null,
+    //     };
 
-        if (!$model) return response()->json(['message' => 'Role tidak valid.'], 400);
+    //     if (!$model) return response()->json(['message' => 'Role tidak valid.'], 400);
 
-        return response()->json([
-            'data' => $model::all()
-        ]);
+    //     return response()->json([
+    //         'data' => $model::all()
+    //     ]);
+    // }
+public function getAllAccounts($role)
+{
+    // Tambahan proteksi manual (opsional)
+    if (!Auth::guard('admin')->check()) {
+        return response()->json(['message' => 'Unauthorized. Admin token required.'], 401);
     }
+
+    $model = match ($role) {
+        'siswa' => Siswa::class,
+        'sekolah' => Sekolah::class,
+        'perusahaan' => Perusahaan::class,
+        'lpk' => LembagaPelatihan::class,
+        default => null,
+    };
+
+    if (!$model) {
+        return response()->json(['message' => 'Role tidak valid.'], 400);
+    }
+
+    return response()->json([
+        'data' => $model::all()
+    ]);
+}
 
     // Delete Akun
     public function deleteAccount(Request $request, $role, $id)

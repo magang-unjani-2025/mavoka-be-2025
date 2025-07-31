@@ -9,7 +9,7 @@ class Pelamar extends Model
 {
     use HasFactory;
 
-    protected $table = 'loeongan_magang';
+    protected $table = 'lowongan_magang';
 
     // protected $fillable = [
     //     'sekolah_id',

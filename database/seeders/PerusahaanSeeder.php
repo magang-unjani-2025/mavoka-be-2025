@@ -23,8 +23,8 @@ class PerusahaanSeeder extends Seeder
             'alamat' => 'Jl. Teknologi No.88, Jakarta',
             'kontak' => '021-12345678',
             'logo_perusahaan' => null,
-            'divisi_penempatan' => 'Software Development',
-            'mentor' => 'Dian Prasetyo',
+            'penanggung_jawab' => 'Dian Prasetyo',
+            'web_perusahaan' => 'https://pmb.unjaya.ac.id/',
             'otp' => Str::random(6),
             'otp_expired_at' => now()->addMinutes(10),
         ]);
