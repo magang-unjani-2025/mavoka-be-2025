@@ -6,26 +6,22 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Queue\SerializesModels;
 
-class OtpMail extends Mailable
+class AccountVerifiedMail extends Mailable
 {
     use Queueable, SerializesModels;
 
-    public $otp;
     public $nama;
 
-
-    public function __construct($otp, $nama)
+    public function __construct($nama)
     {
-        $this->otp = $otp;
         $this->nama = $nama;
     }
 
     public function build()
     {
-        return $this->subject('Kode OTP Verifikasi')
-                    ->view('emails.otp')
+        return $this->subject('Akun Anda Telah Diverifikasi')
+                    ->view('emails.account_verified')
                     ->with([
-                        'otp' => $this->otp,
                         'nama' => $this->nama
                     ]);
     }

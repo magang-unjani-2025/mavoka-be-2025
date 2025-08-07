@@ -16,7 +16,7 @@ class SekolahSeeder extends Seeder
             'password' => Hash::make('sekolah1'),
             'nama_sekolah' => 'SMK Negeri 1',
             'web_sekolah' => 'https://smkn1.sch.id',
-            'npsn' => '12345678',
+            'npsn' => '1234567890',
             'kontak' => '081234567890',
             'alamat' => 'Jl. Pendidikan No. 1',
             'status_verifikasi' => 'Terverifikasi',

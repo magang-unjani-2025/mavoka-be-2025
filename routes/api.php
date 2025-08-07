@@ -20,13 +20,19 @@ Route::prefix('user')->group(function () {
     Route::post('/register/lpk', [AuthController::class, 'registerLembagaPelatihan']);
     Route::post('/verify-otp/{role}', [AuthController::class, 'verifyOTP']);
     Route::post('/resend-otp/{role}', [AuthController::class, 'resendOtp']);
+
     Route::middleware('auth:siswa')->put('/update-akun/{role}/{id}', [AuthController::class, 'updateAccount']);
     Route::middleware('auth:sekolah')->put('/update-akun/{role}/{id}', [AuthController::class, 'updateAccount']);
     Route::middleware('auth:perusahaan')->put('/update-akun/{role}/{id}', [AuthController::class, 'updateAccount']);
     Route::middleware('auth:lpk')->put('/update-akun/{role}/{id}', [AuthController::class, 'updateAccount']);
 
-    Route::middleware('auth:admin')->get('/show-akun/{role}', [AuthController::class, 'getAllAccounts']);
+    Route::get('/show-akun/{role}', [AuthController::class, 'getAllAccounts']);
+    Route::middleware('auth:admin')->get('/show-akun/siswa', [AuthController::class, 'getAllAccounts']);
+
     Route::delete('/delete-akun/{role}/{id}', [AuthController::class, 'deleteAccount']);
+
+    Route::post('/forgot-password/{role}', [AuthController::class, 'forgotPassword']);
+    Route::post('/reset-password/{role}', [AuthController::class, 'resetPassword']);
 });
 
 Route::prefix('sekolah')->group(function () {
@@ -35,7 +41,7 @@ Route::prefix('sekolah')->group(function () {
     Route::post('/create-jurusan', [JurusanController::class, 'store']);
 });
 
-Route::middleware('auth:admin')->put('/verifikasi/{tipe}/{id}', [VerifikasiController::class, 'verifikasi']);
+Route::middleware('auth:admin')->put('/verifikasi/{role}/{id}', [VerifikasiController::class, 'verifikasiAkun']);
 
 Route::prefix('statistik')->group(function () {
 

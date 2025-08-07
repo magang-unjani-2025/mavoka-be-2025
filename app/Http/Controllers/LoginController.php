@@ -40,11 +40,10 @@ class LoginController extends Controller
             return response()->json(['message' => 'Username atau password salah.'], 401);
         }
 
-        if (isset($user->status_verifikasi) && $user->status_verifikasi !== 'Terverifikasi') {
+        if ($role !== 'siswa' && isset($user->status_verifikasi) && $user->status_verifikasi !== 'Terverifikasi') {
             return response()->json(['message' => 'Akun belum diverifikasi.'], 403);
         }
 
-        // Pakai guard sesuai role
         $token = auth($role)->attempt([
             'username' => $request->username,
             'password' => $request->password

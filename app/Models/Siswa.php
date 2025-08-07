@@ -39,6 +39,11 @@ class Siswa extends Authenticatable implements JWTSubject
         return $this->belongsTo(Sekolah::class);
     }
 
+    public function jurusan()
+    {
+        return $this->belongsTo(Jurusan::class);
+    }
+
     public function lamaran()
     {
         return $this->hasMany(Pelamar::class);

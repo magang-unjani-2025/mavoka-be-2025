@@ -7,6 +7,7 @@ use App\Models\Siswa;
 use App\Models\Sekolah;
 use App\Models\Perusahaan;
 use App\Models\LembagaPelatihan;
+use App\Models\Jurusan;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
@@ -16,11 +17,14 @@ use App\Mail\OtpMail;
 
 class AuthController extends Controller
 {
-    private function sendOtpEmail($email, $otp)
+    private function sendOtpEmail($user, $otp)
     {
-        Mail::to($email)->send(new OtpMail($otp));
+        $nama = $user->nama_lengkap ?? $user->nama_sekolah ?? $user->nama_lembaga ?? $user->nama_perusahaan ?? $user->nama ?? 'Siswa';
+        Mail::to($user->email)->send(new OtpMail($otp, $nama));
     }
 
+
+    // Verifikasi OTP
     public function verifyOTP(Request $request, $role)
     {
         $request->validate([
@@ -59,9 +63,17 @@ class AuthController extends Controller
         $user->otp_expired_at = null;
         $user->save();
 
-        return response()->json(['message' => 'Verifikasi berhasil.']);
+        // Ambil nama sesuai field yang tersedia di masing-masing role
+        $nama = $user->nama_perusahaan ?? $user->nama_sekolah ?? $user->nama_lembaga ?? 'Pengguna';
+
+        return response()->json([
+            'message' => 'Verifikasi berhasil.',
+            'nama' => $nama,
+        ]);
     }
 
+
+    //Kirim ulang OTP
     public function resendOtp(Request $request, $role)
     {
         $model = match ($role) {
@@ -71,6 +83,11 @@ class AuthController extends Controller
             'lpk' => LembagaPelatihan::class,
             default => null,
         };
+
+        if (!$model) {
+            return response()->json(['message' => 'Role tidak valid.'], 400);
+        }
+
         $user = $model::where('email', $request->email)->first();
 
         if (!$user) {
@@ -83,11 +100,40 @@ class AuthController extends Controller
         $user->otp_expired_at = now()->addMinutes(10); // Untuk testing
         $user->save();
 
-        // Kirim ulang email OTP
-        Mail::to($user->email)->send(new OtpMail($otp));
+        // Ambil nama dari field yang relevan
+        $nama = $user->nama_lengkap ?? $user->nama_sekolah ?? $user->nama ?? 'Pengguna';
+
+        // Kirim ulang email OTP (dengan nama)
+        Mail::to($user->email)->send(new OtpMail($otp, $nama));
 
         return response()->json(['message' => 'OTP berhasil dikirim ulang']);
     }
+    // public function resendOtp(Request $request, $role)
+    // {
+    //     $model = match ($role) {
+    //         'siswa' => Siswa::class,
+    //         'sekolah' => Sekolah::class,
+    //         'perusahaan' => Perusahaan::class,
+    //         'lpk' => LembagaPelatihan::class,
+    //         default => null,
+    //     };
+    //     $user = $model::where('email', $request->email)->first();
+
+    //     if (!$user) {
+    //         return response()->json(['message' => 'Email tidak ditemukan'], 404);
+    //     }
+
+    //     // Generate OTP baru
+    //     $otp = random_int(100000, 999999);
+    //     $user->otp = $otp;
+    //     $user->otp_expired_at = now()->addMinutes(10); // Untuk testing
+    //     $user->save();
+
+    //     // Kirim ulang email OTP
+    //     Mail::to($user->email)->send(new OtpMail($otp));
+
+    //     return response()->json(['message' => 'OTP berhasil dikirim ulang']);
+    // }
 
 
 
@@ -99,7 +145,7 @@ class AuthController extends Controller
             'email' => 'required|email|unique:sekolah',
             'password' => 'required|min:6',
             'nama_sekolah' => 'required',
-            'npsn' => 'required|unique:sekolah',
+            'npsn' => 'required|unique:sekolah|min:8',
             'web_sekolah' => 'required',
         ]);
 
@@ -124,7 +170,8 @@ class AuthController extends Controller
             'otp_expired_at' => now()->addMinutes(10),
         ]);
 
-        $this->sendOtpEmail($request->email, $otp);
+        // $this->sendOtpEmail($request->email, $otp);
+        $this->sendOtpEmail($sekolah, $otp);
 
         return response()->json([
             'message' => 'Registrasi sekolah berhasil. Cek email untuk OTP.',
@@ -136,40 +183,58 @@ class AuthController extends Controller
     public function registerSiswa(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'nisn' => 'required|unique:siswa',
-            'sekolah_id' => 'required|exists:sekolah,id',
+            'nisn' => 'required|numeric|digits:10|unique:siswa',
+            'nama_sekolah' => 'required|string',
             'kelas' => 'required|integer',
-            'jurusan_id' => 'required|exists:jurusan,id',
+            'nama_jurusan' => 'required|string',
             'tahun_ajaran' => 'required|integer',
+            'email' => 'required|email|unique:siswa,email',
         ]);
 
         if ($validator->fails()) {
             return response()->json($validator->errors(), 422);
         }
 
+        // 1. Cari sekolah dari nama
+        $sekolah = Sekolah::where('nama_sekolah', $request->nama_sekolah)->first();
+        if (!$sekolah) {
+            return response()->json(['message' => 'Sekolah tidak ditemukan.'], 404);
+        }
+
+        // 2. Cari jurusan dari nama jurusan + sekolah_id
+        $jurusan = Jurusan::where('sekolah_id', $sekolah->id)
+            ->where('nama_jurusan', $request->nama_jurusan)
+            ->first();
+        if (!$jurusan) {
+            return response()->json(['message' => 'Jurusan tidak ditemukan.'], 404);
+        }
+
+        // 3. Simpan siswa
         $siswa = Siswa::create([
             'nisn' => $request->nisn,
-            'sekolah_id' => $request->sekolah_id,
+            'sekolah_id' => $sekolah->id,
             'kelas' => $request->kelas,
-            'jurusan_id' => $request->jurusan_id,
+            'jurusan_id' => $jurusan->id,
             'tahun_ajaran' => $request->tahun_ajaran,
-            'status_verifikasi' => 'belum',
+            'status_verifikasi' => 'sudah',
+            'email' => $request->email,
         ]);
 
         return response()->json([
-            'message' => 'Registrasi siswa berhasil. Cek email untuk OTP.',
+            'message' => 'Registrasi siswa berhasil.',
             'data' => $siswa
         ]);
     }
+
 
     // Lengkapi Data Siswa (Register Siswa)
     public function siswaLengkapiRegistrasi(Request $request)
     {
         $validator = Validator::make($request->all(), [
             'nisn' => 'required|exists:siswa,nisn',
-            'sekolah_id' => 'required|exists:sekolah,id',
+            'nama_sekolah' => 'required|string',
             'username' => 'required|unique:siswa,username',
-            'email' => 'required|email|unique:siswa,email',
+            'email' => 'required|email',
             'password' => 'required|min:6',
         ]);
 
@@ -177,27 +242,39 @@ class AuthController extends Controller
             return response()->json($validator->errors(), 422);
         }
 
+        // Ambil sekolah berdasarkan nama_sekolah
+        $sekolah = Sekolah::where('nama_sekolah', $request->nama_sekolah)->first();
+
+        if (!$sekolah) {
+            return response()->json(['message' => 'Sekolah tidak ditemukan.'], 404);
+        }
+
         $otp = random_int(100000, 999999);
 
         $siswa = Siswa::where('nisn', $request->nisn)->first();
+        $siswa = Siswa::where('email', $request->email)->first();
 
         $siswa->update([
             'username' => $request->username,
             'email' => $request->email,
             'password' => Hash::make($request->password),
-            'status_verifikasi' => 'belum',
+            'sekolah_id' => $sekolah->id, // update sekolah_id
+            'status_verifikasi' => 'sudah',
             'tanggal_verifikasi' => null,
             'otp' => $otp,
             'otp_expired_at' => now()->addMinutes(10),
         ]);
 
-        $this->sendOtpEmail($request->email, $otp);
+        // $this->sendOtpEmail($request->email, $otp);
+        $this->sendOtpEmail($siswa, $otp);
+
 
         return response()->json([
             'message' => 'Data siswa berhasil diperbarui. Cek email untuk OTP.',
             'data' => $siswa
         ]);
     }
+
 
 
     // Register Perusahaan
@@ -238,7 +315,9 @@ class AuthController extends Controller
             'otp_expired_at' => $otpExpiredAt,
         ]);
 
-        $this->sendOtpEmail($request->email, $otp);
+        // $this->sendOtpEmail($request->email, $otp);
+        $this->sendOtpEmail($perusahaan, $otp);
+
 
         return response()->json([
             'message' => 'Registrasi perusahaan berhasil. Silakan cek email untuk OTP.',
@@ -248,6 +327,46 @@ class AuthController extends Controller
 
 
     // Register Lembaga Pelatihan
+    // public function registerLembagaPelatihan(Request $request)
+    // {
+    //     $validator = Validator::make($request->all(), [
+    //         'username' => 'required|unique:lembaga_pelatihan',
+    //         'email' => 'required|email|unique:lembaga_pelatihan',
+    //         'password' => 'required|min:6',
+    //         'nama_lembaga' => 'required',
+    //         'bidang_pelatihan' => 'required',
+    //         'web_lembaga' => 'required',
+    //     ]);
+
+    //     if ($validator->fails()) {
+    //         return response()->json($validator->errors(), 422);
+    //     }
+
+    //     $otp = random_int(100000, 999999);
+
+    //     $lembaga = LembagaPelatihan::create([
+    //         'username' => $request->username,
+    //         'email' => $request->email,
+    //         'password' => Hash::make($request->password),
+    //         'nama_lembaga' => $request->nama_lembaga,
+    //         'bidang_pelatihan' => $request->bidang_pelatihan,
+    //         'deskripsi_lembaga' => $request->deskripsi_lembaga,
+    //         'alamat' => $request->alamat,
+    //         'kontak' => $request->kontak,
+    //         'status_akreditasi' => $request->status_akreditasi,
+    //         'status_verifikasi' => 'belum',
+    //         'tanggal_verifikasi' => null,
+    //         'otp' => $otp,
+    //         'otp_expired_at' => now()->addMinutes(10),
+    //     ]);
+
+    //     $this->sendOtpEmail($request->email, $otp);
+
+    //     return response()->json([
+    //         'message' => 'Registrasi lembaga pelatihan berhasil. Cek email untuk OTP.',
+    //         'data' => $lembaga
+    //     ]);
+    // }
     public function registerLembagaPelatihan(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -281,7 +400,12 @@ class AuthController extends Controller
             'otp_expired_at' => now()->addMinutes(10),
         ]);
 
-        $this->sendOtpEmail($request->email, $otp);
+        // Ambil nama dari entitas lembaga
+        $nama = $lembaga->nama_lembaga ?? 'Pengguna';
+
+        // Kirim OTP dengan nama
+        // $this->sendOtpEmail($lembaga->email, $otp, $nama);
+        $this->sendOtpEmail($lembaga, $otp);
 
         return response()->json([
             'message' => 'Registrasi lembaga pelatihan berhasil. Cek email untuk OTP.',
@@ -342,45 +466,35 @@ class AuthController extends Controller
 
 
     // Tampil Semua Akun
-    // public function getAllAccounts($role)
-    // {
-    //     $model = match ($role) {
-    //         'siswa' => Siswa::class,
-    //         'sekolah' => Sekolah::class,
-    //         'perusahaan' => Perusahaan::class,
-    //         'lpk' => LembagaPelatihan::class,
-    //         default => null,
-    //     };
+    public function getAllAccounts($role)
+    {
+        $model = match ($role) {
+            'siswa' => Siswa::class,
+            'sekolah' => Sekolah::class,
+            'perusahaan' => Perusahaan::class,
+            'lpk' => LembagaPelatihan::class,
+            default => null,
+        };
 
-    //     if (!$model) return response()->json(['message' => 'Role tidak valid.'], 400);
+        if (!$model) {
+            return response()->json(['message' => 'Role tidak valid.'], 400);
+        }
 
-    //     return response()->json([
-    //         'data' => $model::all()
-    //     ]);
-    // }
-public function getAllAccounts($role)
-{
-    // Tambahan proteksi manual (opsional)
-    if (!Auth::guard('admin')->check()) {
-        return response()->json(['message' => 'Unauthorized. Admin token required.'], 401);
+        if ($role === 'siswa' && !Auth::guard('admin')->check()) {
+            return response()->json(['message' => 'Unauthorized. Admin token required.'], 401);
+        }
+
+        $query = $model::query();
+
+        if ($role === 'siswa') {
+            $query->with(['sekolah', 'jurusan']);
+        }
+
+        return response()->json([
+            'data' => $query->get()
+        ]);
     }
 
-    $model = match ($role) {
-        'siswa' => Siswa::class,
-        'sekolah' => Sekolah::class,
-        'perusahaan' => Perusahaan::class,
-        'lpk' => LembagaPelatihan::class,
-        default => null,
-    };
-
-    if (!$model) {
-        return response()->json(['message' => 'Role tidak valid.'], 400);
-    }
-
-    return response()->json([
-        'data' => $model::all()
-    ]);
-}
 
     // Delete Akun
     public function deleteAccount(Request $request, $role, $id)
@@ -406,5 +520,81 @@ public function getAllAccounts($role)
         $user->delete();
 
         return response()->json(['message' => 'Akun berhasil dihapus.']);
+    }
+
+    //Lupa Password
+    public function forgotPassword(Request $request, $role)
+    {
+        $request->validate([
+            'email' => 'required|email'
+        ]);
+
+        $model = match ($role) {
+            'siswa' => Siswa::class,
+            'sekolah' => Sekolah::class,
+            'perusahaan' => Perusahaan::class,
+            'lpk' => LembagaPelatihan::class,
+            default => null,
+        };
+
+        if (!$model) {
+            return response()->json(['message' => 'Role tidak valid.'], 400);
+        }
+
+        $user = $model::where('email', $request->email)->first();
+
+        if (!$user) {
+            return response()->json(['message' => 'Email tidak ditemukan.'], 404);
+        }
+
+        // Buat OTP baru
+        $otp = random_int(100000, 999999);
+        $user->otp = $otp;
+        $user->otp_expired_at = now()->addMinutes(10);
+        $user->save();
+
+        // Kirim email
+        $this->sendOtpEmail($user, $otp);
+
+        return response()->json(['message' => 'OTP untuk reset password telah dikirim.']);
+    }
+
+    //Ganti Password
+    public function resetPassword(Request $request, $role)
+    {
+        $request->validate([
+            'email' => 'required|email',
+            'otp' => 'required',
+            'new_password' => 'required|min:6|confirmed',
+        ]);
+
+        $model = match ($role) {
+            'siswa' => Siswa::class,
+            'sekolah' => Sekolah::class,
+            'perusahaan' => Perusahaan::class,
+            'lpk' => LembagaPelatihan::class,
+            default => null,
+        };
+
+        if (!$model) {
+            return response()->json(['message' => 'Role tidak valid.'], 400);
+        }
+
+        $user = $model::where('email', $request->email)->first();
+
+        if (!$user || $user->otp !== $request->otp) {
+            return response()->json(['message' => 'OTP salah atau email tidak ditemukan.'], 400);
+        }
+
+        if (now()->greaterThan($user->otp_expired_at)) {
+            return response()->json(['message' => 'OTP sudah kadaluarsa.'], 400);
+        }
+
+        $user->password = Hash::make($request->new_password);
+        $user->otp = null;
+        $user->otp_expired_at = null;
+        $user->save();
+
+        return response()->json(['message' => 'Password berhasil direset.']);
     }
 }

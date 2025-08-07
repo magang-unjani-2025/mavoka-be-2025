@@ -14,7 +14,7 @@ class SiswaSeeder extends Seeder
     {
         Siswa::insert([
             [
-                'nisn' => '99887766',
+                'nisn' => '9988776655',
                 'sekolah_id'=>1,
                 'kelas' => 12,
                 'jurusan_id' => 1,
