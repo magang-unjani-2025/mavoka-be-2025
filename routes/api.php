@@ -49,6 +49,9 @@ Route::prefix('statistik')->group(function () {
     Route::get('/sekolah', [StatistikController::class, 'totalSekolah']);
     Route::get('/perusahaan', [StatistikController::class, 'totalPerusahaan']);
     Route::get('/lpk', [StatistikController::class, 'totalLembagaPelatihan']);
+
+    Route::get('/bulanan/{role}', [StatistikController::class, 'statistikBulanan']);
+    Route::get('/tahunan/{role}', [StatistikController::class, 'statistikTahunan']);
 });
 
 Route::prefix('lowongan')->group(function () {

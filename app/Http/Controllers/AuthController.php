@@ -327,46 +327,6 @@ class AuthController extends Controller
 
 
     // Register Lembaga Pelatihan
-    // public function registerLembagaPelatihan(Request $request)
-    // {
-    //     $validator = Validator::make($request->all(), [
-    //         'username' => 'required|unique:lembaga_pelatihan',
-    //         'email' => 'required|email|unique:lembaga_pelatihan',
-    //         'password' => 'required|min:6',
-    //         'nama_lembaga' => 'required',
-    //         'bidang_pelatihan' => 'required',
-    //         'web_lembaga' => 'required',
-    //     ]);
-
-    //     if ($validator->fails()) {
-    //         return response()->json($validator->errors(), 422);
-    //     }
-
-    //     $otp = random_int(100000, 999999);
-
-    //     $lembaga = LembagaPelatihan::create([
-    //         'username' => $request->username,
-    //         'email' => $request->email,
-    //         'password' => Hash::make($request->password),
-    //         'nama_lembaga' => $request->nama_lembaga,
-    //         'bidang_pelatihan' => $request->bidang_pelatihan,
-    //         'deskripsi_lembaga' => $request->deskripsi_lembaga,
-    //         'alamat' => $request->alamat,
-    //         'kontak' => $request->kontak,
-    //         'status_akreditasi' => $request->status_akreditasi,
-    //         'status_verifikasi' => 'belum',
-    //         'tanggal_verifikasi' => null,
-    //         'otp' => $otp,
-    //         'otp_expired_at' => now()->addMinutes(10),
-    //     ]);
-
-    //     $this->sendOtpEmail($request->email, $otp);
-
-    //     return response()->json([
-    //         'message' => 'Registrasi lembaga pelatihan berhasil. Cek email untuk OTP.',
-    //         'data' => $lembaga
-    //     ]);
-    // }
     public function registerLembagaPelatihan(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -400,11 +360,8 @@ class AuthController extends Controller
             'otp_expired_at' => now()->addMinutes(10),
         ]);
 
-        // Ambil nama dari entitas lembaga
         $nama = $lembaga->nama_lembaga ?? 'Pengguna';
 
-        // Kirim OTP dengan nama
-        // $this->sendOtpEmail($lembaga->email, $otp, $nama);
         $this->sendOtpEmail($lembaga, $otp);
 
         return response()->json([
@@ -429,13 +386,11 @@ class AuthController extends Controller
             return response()->json(['message' => 'Role tidak valid.'], 400);
         }
 
-        // Ambil user dari token (berdasarkan guard yang sesuai)
         $authUser = auth($role)->user();
         if (!$authUser) {
             return response()->json(['message' => 'Unauthenticated.'], 401);
         }
 
-        // Pastikan ID yang diakses sesuai dengan yang login
         if ($authUser->id != $id) {
             return response()->json(['message' => 'Akses ditolak.'], 403);
         }
@@ -445,7 +400,6 @@ class AuthController extends Controller
             return response()->json(['message' => 'Data tidak ditemukan.'], 404);
         }
 
-        // Daftar field yang boleh diupdate berdasarkan role
         $allowedFields = match ($role) {
             'sekolah' => ['username', 'password', 'alamat', 'kontak'],
             'siswa' => ['username', 'password', 'tanggal_lahir', 'alamat', 'kontak', 'jenis_kelamin', 'foto_profil'],
