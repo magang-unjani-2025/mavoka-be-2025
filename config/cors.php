@@ -13,6 +13,10 @@ return [
     'allowed_origins' => [
         'http://localhost:3000', // Ganti dengan domain Next.js Anda
         // Tambahkan domain lain jika diperlukan
+        'http://dev.mavoka.fitacademy.id:3000', // Development
+        'https://dev.mavoka.fitacademy.id:3000', // Development
+        'http://dev-admin.mavoka.fitacademy.id:3000', // Production
+        'https://dev-admin.mavoka.fitacademy.id:3000', // Production
     ],
     'paths' => ['api/*'],
 
