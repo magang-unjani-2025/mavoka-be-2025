@@ -8,8 +8,8 @@ ARG USER_GID
 
 ENV DEPLOY_USER=$USERNAME
 
-RUN groupadd -r -g ${GID} ${USERNAME} && \
-    useradd -r -m -u ${UID} -g ${GID} --no-log-init ${USERNAME}
+RUN groupadd -r -g ${USER_GID} ${USERNAME} && \
+    useradd -r -m -u ${USER_UID} -g ${USER_GID} --no-log-init ${USERNAME}
 
 RUN apt-get update && apt-get install -y \
     libjpeg-dev \
@@ -17,6 +17,7 @@ RUN apt-get update && apt-get install -y \
     libpng-dev \
     libonig-dev \
     libxml2-dev \
+    libpq-dev \
     zip \
     unzip \
     curl \
@@ -24,9 +25,7 @@ RUN apt-get update && apt-get install -y \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 RUN docker-php-ext-configure gd --with-freetype=/usr/include/ --with-jpeg=/usr/include/ \
-    && docker-php-ext-configure pgsql --with-pgsql=/usr/local/pgsql
-
-RUN docker-php-ext-install pdo_pgsql pgsql mbstring exif pcntl bcmath gd
+    && docker-php-ext-install -j$(nproc) gd pdo_pgsql pgsql mbstring exif pcntl bcmath
 
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
