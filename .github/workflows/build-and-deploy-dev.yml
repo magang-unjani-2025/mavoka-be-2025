@@ -3,13 +3,11 @@ name: Build and Deploy Backend to Development
 on: push
 
 jobs:
-  build:
+  build-and-deploy:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
-        with:
-          ref: 'feature/cicd'
 
       - name: Docker Setup Compose
         uses: docker/setup-compose-action@v1
@@ -90,3 +88,42 @@ jobs:
             uid=$uid gid=$gid docker compose --file docker-compose-dev.yml up --detach
             docker exec mavoka-be-2025-dev init.sh
             docker restart mavoka-be-2025-dev
+
+  generate-autoload:
+    name: Generate Optimized Autoloader
+    needs: build-and-deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Composer (php-actions)
+        uses: php-actions/composer@v6
+        with:
+          version: '2.8.11'
+          php_version: '8.2'
+          php_extensions: gd pdo_mysql exif pcntl bcmath
+          dev: yes
+          args: --no-interaction --prefer-dist
+
+      - name: Transfer Autoloader with SCP
+        uses: appleboy/scp-action@v1.0.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          source: "vendor/autoload.php,vendor/composer"
+          target: "${{ secrets.SCP_PATH }}"
+
+      - name: Fix Directory Permission using SSH
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          envs: user,uid,gid
+          script: |
+            cd ${{ secrets.SCP_PATH }}
+            chown -R ${{ secrets.SSH_USERNAME }}:www-data vendor
