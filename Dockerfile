@@ -1,4 +1,4 @@
-FROM php:8.2-fpm-alpine3.22
+FROM php:8.2-fpm
 
 WORKDIR /var/www/html
 
@@ -8,25 +8,24 @@ ARG USER_GID
 
 ENV DEPLOY_USER=$USERNAME
 
-RUN addgroup -g ${USER_GID} ${USERNAME} && \
-    adduser --disabled-password --uid ${USER_UID} --ingroup ${USERNAME} ${USERNAME}
+RUN groupadd -r -g ${USER_GID} ${USERNAME} && \
+    useradd -r -m -u ${USER_UID} -g ${USER_GID} --no-log-init ${USERNAME}
 
-RUN apk update && apk add --no-cache \
-    libjpeg-turbo-dev \
-    freetype-dev \
+RUN apt-get update && apt-get install -y \
+    libjpeg-dev \
+    libfreetype6-dev \
     libpng-dev \
-    oniguruma-dev \
+    libonig-dev \
     libxml2-dev \
-    postgresql-dev \
+    libpq-dev \
     zip \
     unzip \
     curl \
-    git
+    git \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 RUN docker-php-ext-configure gd --with-freetype=/usr/include/ --with-jpeg=/usr/include/ \
-    && docker-php-ext-configure pgsql --with-pgsql=/usr/local/pgsql
-
-RUN docker-php-ext-install pdo_pgsql pgsql mbstring exif pcntl bcmath gd
+    && docker-php-ext-install -j$(nproc) gd pdo_pgsql pgsql mbstring exif pcntl bcmath
 
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
