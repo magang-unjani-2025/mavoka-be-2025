@@ -1,0 +1,92 @@
+name: Build and Deploy Backend to Development
+
+on: push
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          ref: 'feature/cicd'
+
+      - name: Docker Setup Compose
+        uses: docker/setup-compose-action@v1
+
+      - name: Write .env File
+        run: |
+          cat << 'EOF' > .env.development
+          ${{ vars.ENV_DEV }}
+          EOF
+
+      - name: Get Server User ID
+        id: get_uid
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          capture_stdout: true
+          script: id -u
+
+      - name: Get Server Group ID
+        id: get_gid
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          capture_stdout: true
+          script: id -g
+
+      - name: Get Server User Information
+        id: get_user_info
+        run: |
+          USER_ID=$(echo '${{ steps.get_uid.outputs.stdout }}' | head -n 1)
+          GROUP_ID=$(echo '${{ steps.get_gid.outputs.stdout }}' | head -n 1)
+          echo "username=$USERNAME" >> $GITHUB_OUTPUT
+          echo "uid=$USER_ID" >> $GITHUB_OUTPUT
+          echo "gid=$GROUP_ID" >> $GITHUB_OUTPUT
+
+      - name: Build Container with Docker Compose
+        env:
+          uid: ${{ steps.get_user_info.outputs.uid }}
+          gid: ${{ steps.get_user_info.outputs.gid }}
+        run: |
+          uid=$uid gid=$gid docker compose --file docker-compose-dev.yml build --no-cache
+          docker image save mavoka-be-2025-dev-img:latest --output mavoka-be-2025-dev-img.tar
+
+      - name: Copy Image to Server with SCP
+        uses: appleboy/scp-action@v1
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          source: './mavoka-be-2025-dev-img.tar'
+          target: ${{ secrets.SCP_PATH }}
+
+      - name: Deploy (Development) with SSH
+        uses: appleboy/ssh-action@v1
+        env:
+          uid: ${{ steps.get_user_info.outputs.uid }}
+          gid: ${{ steps.get_user_info.outputs.gid }}
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          script: |
+            cd ${{ secrets.SCP_PATH }}
+            git pull origin feature/cicd
+            cat << 'EOF' > .env.development
+            ${{ vars.ENV_DEV }}
+            EOF
+            docker compose --file docker-compose-dev.yml down --rmi all
+            docker image load --input mavoka-be-2025-dev-img.tar
+            uid=$uid gid=$gid docker compose --file docker-compose-dev.yml up --detach
+            docker exec mavoka-be-2025-dev init.sh
+            docker restart mavoka-be-2025-dev
