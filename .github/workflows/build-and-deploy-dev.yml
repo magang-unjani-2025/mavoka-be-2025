@@ -6,6 +6,9 @@ on:
       - dev
   workflow_dispatch:
 
+env:
+  CONTAINER_NAME: mavoka-be-2025-dev
+
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
@@ -59,13 +62,13 @@ jobs:
           gid: ${{ steps.get_user_info.outputs.gid }}
         run: |
           uid=$uid gid=$gid docker compose --file docker-compose-dev.yml build --no-cache
-          docker image save mavoka-be-2025-dev-img:latest --output mavoka-be-2025-dev-img.tar
+          docker image save $CONTAINER_NAME-img:latest --output $CONTAINER_NAME-img.tar
 
       - name: Copy Image with rsync over SSH
         uses: burnett01/rsync-deployments@7.0.2
         with:
           switches: -avzr --delete
-          path: mavoka-be-2025-dev-img.tar
+          path: $CONTAINER_NAME-img.tar
           remote_path: ${{ secrets.SCP_PATH }}
           remote_host: ${{ secrets.SSH_HOST }}
           remote_port: ${{ secrets.SSH_PORT }}
@@ -89,58 +92,62 @@ jobs:
             ${{ vars.ENV_DEV }}
             EOF
             docker compose --file docker-compose-dev.yml down --rmi all
-            docker image load --input mavoka-be-2025-dev-img.tar
+            docker image load --input ${{ env.CONTAINER_NAME }}-img.tar
             uid=$uid gid=$gid docker compose --file docker-compose-dev.yml up --detach
-            docker exec mavoka-be-2025-dev init.sh
-            docker restart mavoka-be-2025-dev
 
-  generate-autoload:
-    name: Generate Optimized Autoloader
+  composer-install:
+    name: Install Dependencies and Transfer it
     needs: build-and-deploy
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      - name: Get Composer Cache Directory
+        id: composer-cache
+        run: |
+          echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+
+      - name: Restore Composer Cache
+        uses: actions/cache@v4
+        id: cache
+        with:
+          path: |
+            ${{ steps.composer-cache.outputs.dir }}
+            vendor
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-composer-
+
       - name: Composer (php-actions)
         uses: php-actions/composer@v6
+        if: steps.cache.outputs.cache-hit != 'true'
         with:
           version: '2.8.11'
           php_version: '8.2'
           php_extensions: gd pdo_mysql exif pcntl bcmath
           dev: yes
-          args: --no-interaction --prefer-dist
+          args: --no-interaction --prefer-dist --optimize-autoloader
 
-      - name: Transfer Autoloader with rsync over SSH
+      - name: Transfer Vendor with rsync over SSH
         uses: burnett01/rsync-deployments@7.0.2
+        if: steps.cache.outputs.cache-hit != 'true'
         with:
           switches: -avzr --delete
-          path: vendor/autoload.php
+          path: vendor
           remote_path: ${{ secrets.SCP_PATH }}
           remote_host: ${{ secrets.SSH_HOST }}
           remote_port: ${{ secrets.SSH_PORT }}
           remote_user: ${{ secrets.SSH_USERNAME }}
           remote_key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-      - name: Transfer Autoloader with rsync over SSH
-        uses: burnett01/rsync-deployments@7.0.2
-        with:
-          switches: -avzr --delete
-          path: vendor/composer
-          remote_path: ${{ secrets.SCP_PATH }}
-          remote_host: ${{ secrets.SSH_HOST }}
-          remote_port: ${{ secrets.SSH_PORT }}
-          remote_user: ${{ secrets.SSH_USERNAME }}
-          remote_key: ${{ secrets.SSH_PRIVATE_KEY }}
-
-      - name: Fix Directory Permission using SSH
+      - name: Run init script with SSH
         uses: appleboy/ssh-action@v1.2.2
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: ${{ secrets.SSH_PORT }}
-          envs: user,uid,gid
           script: |
-            cd ${{ secrets.SCP_PATH }}
-            chown -R ${{ secrets.SSH_USERNAME }}:www-data vendor
+            docker exec ${{ env.CONTAINER_NAME }} init.sh
+            docker restart ${{ env.CONTAINER_NAME }}

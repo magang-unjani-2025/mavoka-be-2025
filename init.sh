@@ -3,9 +3,6 @@
 LARAVEL_ROOT="/var/www/html"
 WEB_USER="www-data"
 
-# Install dependencies
-composer install --no-interaction --prefer-dist --no-autoloader
-
 # Change project ownership
 chown -R $DEPLOY_USER:$WEB_USER $LARAVEL_ROOT
 
