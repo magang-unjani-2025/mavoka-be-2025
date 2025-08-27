@@ -1,6 +1,10 @@
 name: Build and Deploy Backend to Development
 
-on: push
+on:
+  push:
+    branches:
+      - dev
+  workflow_dispatch:
 
 jobs:
   build-and-deploy:
@@ -57,15 +61,16 @@ jobs:
           uid=$uid gid=$gid docker compose --file docker-compose-dev.yml build --no-cache
           docker image save mavoka-be-2025-dev-img:latest --output mavoka-be-2025-dev-img.tar
 
-      - name: Copy Image to Server with SCP
-        uses: appleboy/scp-action@v1
+      - name: Copy Image with rsync over SSH
+        uses: burnett01/rsync-deployments@7.0.2
         with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USERNAME }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: ${{ secrets.SSH_PORT }}
-          source: './mavoka-be-2025-dev-img.tar'
-          target: ${{ secrets.SCP_PATH }}
+          switches: -avzr --delete
+          path: mavoka-be-2025-dev-img.tar
+          remote_path: ${{ secrets.SCP_PATH }}
+          remote_host: ${{ secrets.SSH_HOST }}
+          remote_port: ${{ secrets.SSH_PORT }}
+          remote_user: ${{ secrets.SSH_USERNAME }}
+          remote_key: ${{ secrets.SSH_PRIVATE_KEY }}
 
       - name: Deploy (Development) with SSH
         uses: appleboy/ssh-action@v1
@@ -106,15 +111,27 @@ jobs:
           dev: yes
           args: --no-interaction --prefer-dist
 
-      - name: Transfer Autoloader with SCP
-        uses: appleboy/scp-action@v1.0.0
+      - name: Transfer Autoloader with rsync over SSH
+        uses: burnett01/rsync-deployments@7.0.2
         with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USERNAME }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: ${{ secrets.SSH_PORT }}
-          source: "vendor/autoload.php,vendor/composer"
-          target: "${{ secrets.SCP_PATH }}"
+          switches: -avzr --delete
+          path: vendor/autoload.php
+          remote_path: ${{ secrets.SCP_PATH }}
+          remote_host: ${{ secrets.SSH_HOST }}
+          remote_port: ${{ secrets.SSH_PORT }}
+          remote_user: ${{ secrets.SSH_USERNAME }}
+          remote_key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Transfer Autoloader with rsync over SSH
+        uses: burnett01/rsync-deployments@7.0.2
+        with:
+          switches: -avzr --delete
+          path: vendor/composer
+          remote_path: ${{ secrets.SCP_PATH }}
+          remote_host: ${{ secrets.SSH_HOST }}
+          remote_port: ${{ secrets.SSH_PORT }}
+          remote_user: ${{ secrets.SSH_USERNAME }}
+          remote_key: ${{ secrets.SSH_PRIVATE_KEY }}
 
       - name: Fix Directory Permission using SSH
         uses: appleboy/ssh-action@v1.2.2
