@@ -41,7 +41,12 @@ class VerifikasiController extends Controller
     $akun->status_verifikasi = 'Terverifikasi';
     $akun->save();
 
-    $nama = $akun->nama_sekolah ?? $akun->nama_lengkap ?? $akun->nama ?? 'Siswa';
+    $nama = $akun->nama_perusahaan
+            ?? $akun->nama_sekolah
+            ?? $akun->nama_lengkap
+            ?? $akun->nama_lembaga
+            ?? $akun->nama
+            ?? 'Siswa';
 
     if ($akun->email && filter_var($akun->email, FILTER_VALIDATE_EMAIL)) {
         Mail::to($akun->email)->send(new AccountVerifiedMail($nama));

@@ -8,8 +8,10 @@ use App\Http\Controllers\SekolahController;
 use App\Http\Controllers\JurusanController;
 use App\Http\Controllers\StatistikController;
 use App\Http\Controllers\LowonganMagangController;
+use App\Http\Controllers\UserController;
 
 Route::prefix('user')->group(function () {
+    // Auth & register
     Route::post('/login/{role}', [LoginController::class, 'login']);
     Route::post('/logout', [LoginController::class, 'logout']);
 
@@ -21,18 +23,25 @@ Route::prefix('user')->group(function () {
     Route::post('/verify-otp/{role}', [AuthController::class, 'verifyOTP']);
     Route::post('/resend-otp/{role}', [AuthController::class, 'resendOtp']);
 
+    // Update akun (middleware sesuai role)
     Route::middleware('auth:siswa')->put('/update-akun/{role}/{id}', [AuthController::class, 'updateAccount']);
     Route::middleware('auth:sekolah')->put('/update-akun/{role}/{id}', [AuthController::class, 'updateAccount']);
     Route::middleware('auth:perusahaan')->put('/update-akun/{role}/{id}', [AuthController::class, 'updateAccount']);
     Route::middleware('auth:lpk')->put('/update-akun/{role}/{id}', [AuthController::class, 'updateAccount']);
 
+    // Get all akun
     Route::get('/show-akun/{role}', [AuthController::class, 'getAllAccounts']);
     Route::middleware('auth:admin')->get('/show-akun/siswa', [AuthController::class, 'getAllAccounts']);
 
+    // Delete akun
     Route::delete('/delete-akun/{role}/{id}', [AuthController::class, 'deleteAccount']);
 
+    // Forgot / reset password
     Route::post('/forgot-password/{role}', [AuthController::class, 'forgotPassword']);
     Route::post('/reset-password/{role}', [AuthController::class, 'resetPassword']);
+
+    // *Get akun by ID (semua role)*
+    Route::get('/{role}/{id}', [UserController::class, 'getById']);
 });
 
 Route::prefix('sekolah')->group(function () {
