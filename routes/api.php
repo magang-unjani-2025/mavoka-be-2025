@@ -9,6 +9,7 @@ use App\Http\Controllers\JurusanController;
 use App\Http\Controllers\StatistikController;
 use App\Http\Controllers\LowonganMagangController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\Auth\SiswaAuthController;
 
 Route::prefix('user')->group(function () {
     // Auth & register
@@ -48,6 +49,15 @@ Route::prefix('sekolah')->group(function () {
     Route::get('/all-sekolah', [SekolahController::class, 'getAllSekolah']);
     Route::get('/jurusan/{sekolah_id}', [SekolahController::class, 'getJurusanBySekolah']);
     Route::post('/create-jurusan', [JurusanController::class, 'store']);
+    Route::post('/upload-siswa-single', [SekolahController::class, 'uploadSiswaSingle']);
+    Route::post('/upload-siswa-bulk', [SekolahController::class, 'uploadSiswaBulk']);
+});
+
+Route::prefix('siswa')->group(function () {
+    Route::get('/all', [SiswaAuthController::class, 'getAll']);
+    Route::get('/{id}', [SiswaAuthController::class, 'getById']);
+    Route::put('/update/{id}', [SiswaAuthController::class, 'update']);
+    Route::delete('/delete/{id}', [SiswaAuthController::class, 'delete']);
 });
 
 Route::middleware('auth:admin')->put('/verifikasi/{role}/{id}', [VerifikasiController::class, 'verifikasiAkun']);
