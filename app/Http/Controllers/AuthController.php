@@ -165,7 +165,7 @@ class AuthController extends Controller
             'kontak' => $request->kontak,
             'alamat' => $request->alamat,
             'status_verifikasi' => 'belum',
-            'tanggal_verifikasi' => null,
+            'tanggal_verifikasi' => now(),
             'otp' => $otp,
             'otp_expired_at' => now()->addMinutes(10),
         ]);
@@ -217,6 +217,7 @@ class AuthController extends Controller
             'jurusan_id' => $jurusan->id,
             'tahun_ajaran' => $request->tahun_ajaran,
             'status_verifikasi' => 'sudah',
+            'tanggal_verifikasi' => now(),
             'email' => $request->email,
         ]);
 
@@ -310,7 +311,7 @@ class AuthController extends Controller
             'penanggung_jawab' => $request->penanggung_jawab ?? null,
             'logo_perusahaan' => $request->logo_perusahaan ?? null,
             'status_verifikasi' => 'belum',
-            'tanggal_verifikasi' => null,
+            'tanggal_verifikasi' => now(),
             'otp' => $otp,
             'otp_expired_at' => $otpExpiredAt,
         ]);
@@ -355,7 +356,7 @@ class AuthController extends Controller
             'kontak' => $request->kontak,
             'status_akreditasi' => $request->status_akreditasi,
             'status_verifikasi' => 'belum',
-            'tanggal_verifikasi' => null,
+            'tanggal_verifikasi' => now(),
             'otp' => $otp,
             'otp_expired_at' => now()->addMinutes(10),
         ]);

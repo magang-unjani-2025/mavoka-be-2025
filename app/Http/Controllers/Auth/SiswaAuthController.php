@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use App\Models\Siswa;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Validator;
 
 class SiswaAuthController extends Controller
 {
@@ -70,5 +71,65 @@ class SiswaAuthController extends Controller
     {
         $request->session()->forget('siswa_id');
         return redirect('/login-siswa');
+    }
+
+    // Get all siswa
+    public function getAll()
+    {
+        return response()->json(Siswa::all());
+    }
+
+    // Get siswa by id
+    public function getById($id)
+    {
+        $siswa = Siswa::find($id);
+        if (!$siswa) {
+            return response()->json(['message' => 'Siswa tidak ditemukan'], 404);
+        }
+        return response()->json($siswa);
+    }
+
+    // Update data siswa
+    public function update(Request $request, $id)
+    {
+        $siswa = Siswa::find($id);
+        if (!$siswa) {
+            return response()->json(['message' => 'Siswa tidak ditemukan'], 404);
+        }
+        $data = $request->only(array_keys($request->all()));
+        $validator = Validator::make($data, [
+            'username' => 'sometimes|required|unique:siswa,username,' . $id,
+            'email' => 'sometimes|required|email|unique:siswa,email,' . $id,
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+        if (isset($data['password'])) {
+            $data['password'] = Hash::make($data['password']);
+        }
+        if (isset($data['status_verifikasi'])) {
+            $status = strtolower(trim($data['status_verifikasi']));
+            if ($status === 'sudah' || $status === '1' || $status === 'true') {
+                $data['status_verifikasi'] = 'sudah';
+            } elseif ($status === 'belum' || $status === '0' || $status === 'false') {
+                $data['status_verifikasi'] = 'belum';
+            } else {
+                $data['status_verifikasi'] = 'belum';
+            }
+        }
+        $siswa->update($data);
+        $siswa->refresh();
+        return response()->json(['message' => 'Siswa berhasil diupdate', 'siswa' => $siswa]);
+    }
+
+    // Delete data siswa
+    public function delete($id)
+    {
+        $siswa = Siswa::find($id);
+        if (!$siswa) {
+            return response()->json(['message' => 'Siswa tidak ditemukan'], 404);
+        }
+        $siswa->delete();
+        return response()->json(['message' => 'Siswa berhasil dihapus']);
     }
 }
