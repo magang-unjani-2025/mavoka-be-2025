@@ -65,22 +65,42 @@ class SekolahController extends Controller
     }
 
     // Endpoint: Melihat status lamaran siswa berdasarkan sekolah
-    public function getLamaranSiswaBySekolah($sekolah_id)
+    public function getLamaranSiswaBySekolah(Request $request, $sekolah_id)
     {
-        // Ambil semua siswa di sekolah ini beserta lamaran dan statusnya
-        $siswa = Siswa::where('sekolah_id', $sekolah_id)
-            ->with(['lamaran.lowongan', 'jurusan']) // relasi lamaran, lowongan, dan jurusan
-            ->get();
+        $status = $request->query('status'); // lamar|wawancara|penawaran|ditolak|diterima|belum
+        $allowedStatus = ['lamar','wawancara','penawaran','ditolak','diterima','belum'];
+        if ($status && !in_array($status, $allowedStatus, true)) {
+            return response()->json(['message' => 'Status filter tidak valid'], 422);
+        }
 
-        // Format data: siswa, lamaran, status_lamaran
-        $result = $siswa->map(function ($s) {
+        $query = Siswa::where('sekolah_id', $sekolah_id)->with(['lamaran.lowongan', 'jurusan']);
+
+        // Jika filter 'belum', ambil siswa tanpa lamaran
+        if ($status === 'belum') {
+            $query->whereDoesntHave('lamaran');
+        } elseif ($status) {
+            // Filter siswa yang punya minimal satu lamaran dengan status tertentu
+            $query->whereHas('lamaran', function($q) use ($status) {
+                $q->where('status_lamaran', $status);
+            });
+        }
+
+        $siswa = $query->get();
+
+        $result = $siswa->map(function ($s) use ($status) {
+            $lamaran = $s->lamaran;
+            if ($status && $status !== 'belum') {
+                // Filter lamaran di representasi jika status spesifik diminta
+                $lamaran = $lamaran->where('status_lamaran', $status)->values();
+            }
             return [
                 'id' => $s->id,
                 'nama_lengkap' => $s->nama_lengkap,
                 'nisn' => $s->nisn,
                 'kelas' => $s->kelas,
                 'jurusan' => $s->jurusan ? $s->jurusan->nama_jurusan : null,
-                'lamaran' => $s->lamaran->map(function ($l) {
+                'jumlah_lamaran' => $s->lamaran->count(),
+                'lamaran' => $lamaran->map(function ($l) {
                     return [
                         'lowongan_id' => $l->lowongan_id,
                         'nama_lowongan' => $l->lowongan ? $l->lowongan->judul_lowongan : null,
@@ -91,7 +111,11 @@ class SekolahController extends Controller
             ];
         });
 
-        return response()->json(['data' => $result]);
+        return response()->json([
+            'filter_status' => $status,
+            'total_siswa' => $result->count(),
+            'data' => $result
+        ]);
     }
 
     // Upload satu siswa
@@ -105,7 +129,7 @@ class SekolahController extends Controller
             'nisn' => 'required|unique:siswa',
             'kelas' => 'required',
             'nama_jurusan' => 'required|string',
-            'tahun_ajaran' => 'required',
+            'tahun_ajaran' => 'required|string',
             'tanggal_lahir' => 'nullable|date',
             'jenis_kelamin' => 'nullable',
             'alamat' => 'nullable',
@@ -143,16 +167,6 @@ class SekolahController extends Controller
         if (isset($data['kelas']) && $data['kelas'] !== null && $data['kelas'] !== '') {
             if (is_numeric($data['kelas'])) {
                 $data['kelas'] = (int) $data['kelas'];
-            }
-        }
-
-        // Normalisasi tahun_ajaran: ambil tahun pertama dari format seperti "2024/2025"
-        if (isset($data['tahun_ajaran']) && $data['tahun_ajaran'] !== null && trim((string)$data['tahun_ajaran']) !== '') {
-            $taRaw = trim((string) $data['tahun_ajaran']);
-            if (preg_match('/(19\d{2}|20\d{2})/', $taRaw, $m)) {
-                $data['tahun_ajaran'] = (int) $m[1];
-            } elseif (is_numeric($taRaw)) {
-                $data['tahun_ajaran'] = (int) $taRaw;
             }
         }
 
@@ -281,7 +295,7 @@ class SekolahController extends Controller
                     'nisn' => !is_null($map['nisn']) ? ($row[$map['nisn']] ?? null) : null,
                     'kelas' => !is_null($map['kelas']) ? ($row[$map['kelas']] ?? null) : null,
                     'jurusan_id' => $jurusan_id,
-                    'tahun_ajaran' => !is_null($map['tahunajaran']) ? ($row[$map['tahunajaran']] ?? null) : null,
+                    'tahun_ajaran' => !is_null($map['tahunajaran']) ? (isset($row[$map['tahunajaran']]) ? trim((string)$row[$map['tahunajaran']]) : null) : null,
                     // Handle kemungkinan tanggal Excel numeric -> konversi ke Y-m-d
                     'tanggal_lahir' => !is_null($map['tanggallahir']) ? (function($val){
                         if (is_null($val) || trim((string)$val) === '') return null;
@@ -301,17 +315,13 @@ class SekolahController extends Controller
                     'sekolah_id' => $sekolah_id,
                 ];
 
-                // Normalisasi tahun_ajaran: ambil tahun pertama dari format seperti "2024/2025"
+                // Tidak normalisasi: kosong = gagal, selain itu disimpan apa adanya
                 if (!is_null($data['tahun_ajaran'])) {
-                    $taRaw = trim((string) $data['tahun_ajaran']);
-                    if ($taRaw !== '') {
-                        if (preg_match('/(19\\d{2}|20\\d{2})/', $taRaw, $m)) {
-                            $data['tahun_ajaran'] = (int) $m[1];
-                        } elseif (is_numeric($taRaw)) {
-                            $data['tahun_ajaran'] = (int) $taRaw;
-                        } else {
-                            $data['tahun_ajaran'] = null; // biar divalidasi gagal dan masuk daftar failed
-                        }
+                    $taRaw = trim((string)$data['tahun_ajaran']);
+                    if ($taRaw === '') {
+                        $data['tahun_ajaran'] = null; // memicu gagal validasi
+                    } else {
+                        $data['tahun_ajaran'] = $taRaw;
                     }
                 }
 
@@ -323,7 +333,7 @@ class SekolahController extends Controller
                     'nisn' => 'required|unique:siswa',
                     'kelas' => 'required',
                     'jurusan_id' => 'required|exists:jurusan,id',
-                    'tahun_ajaran' => 'required|integer',
+                    'tahun_ajaran' => 'required|string',
                     'tanggal_lahir' => 'nullable|date',
                     'jenis_kelamin' => 'nullable',
                     'alamat' => 'nullable',

@@ -104,12 +104,16 @@ class PelamarController extends Controller
         }
     }
 
-    // Endpoint perusahaan / admin untuk ubah status lamaran (interview, penawaran, ditolak)
+    // Endpoint perusahaan / admin untuk ubah status lamaran (wawancara, penawaran, ditolak)
     public function updateStatus(Request $request, $id)
     {
         // Terima alias 'status_lamaran' agar kompatibel dengan klien yang sudah terlanjur memakainya
         if (!$request->has('status') && $request->has('status_lamaran')) {
             $request->merge(['status' => $request->input('status_lamaran')]);
+        }
+        // Alias lama 'interview' -> 'wawancara'
+        if ($request->has('status') && $request->input('status') === 'interview') {
+            $request->merge(['status' => 'wawancara']);
         }
         // Fallback: query param ?status= / ?status_lamaran=
         if (!$request->has('status')) {
@@ -134,7 +138,7 @@ class PelamarController extends Controller
             }
         }
         $validator = Validator::make($request->all(), [
-            'status' => 'required|in:interview,penawaran,diterima,ditolak'
+            'status' => 'required|in:wawancara,penawaran,diterima,ditolak'
         ], [
             'status.required' => 'Status wajib diisi.',
             'status.in' => 'Status tidak valid.'
@@ -156,8 +160,8 @@ class PelamarController extends Controller
         $target = $request->status;
 
         $allowed = [
-            'lamar' => ['interview','ditolak'],
-            'interview' => ['penawaran','ditolak'],
+            'lamar' => ['wawancara','ditolak'],
+            'wawancara' => ['penawaran','ditolak'],
             'penawaran' => ['diterima','ditolak'],
             'diterima' => [],
             'ditolak' => []

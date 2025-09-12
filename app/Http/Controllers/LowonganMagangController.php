@@ -36,6 +36,8 @@ class LowonganMagangController extends Controller
             'benefit' => 'required|string',
             'status' => 'nullable|in:aktif,tidak',
             'deadline_lamaran' => 'required|date',
+            'periode_awal' => 'required|date',
+            'periode_akhir' => 'required|date|after_or_equal:periode_awal',
         ]);
 
         $data = array_merge($validated, [
@@ -61,7 +63,7 @@ class LowonganMagangController extends Controller
         $lowongan = LowonganMagang::where('perusahaan_id', $perusahaan->id)->findOrFail($id);
 
         $fields = $request->only([
-            'judul_lowongan','deskripsi','posisi','kuota','lokasi_penempatan','persyaratan','benefit','status','deadline_lamaran'
+            'judul_lowongan','deskripsi','posisi','kuota','lokasi_penempatan','persyaratan','benefit','status','deadline_lamaran','periode_awal','periode_akhir'
         ]);
         // Jika kuota diupdate ke 0 atau sudah 0 -> status otomatis 'tidak'
         if (array_key_exists('kuota', $fields)) {
