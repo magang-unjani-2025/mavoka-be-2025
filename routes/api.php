@@ -11,6 +11,7 @@ use App\Http\Controllers\LowonganMagangController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\Auth\SiswaAuthController;
 use App\Http\Controllers\PelamarController;
+use App\Http\Controllers\PerusahaanController;
 
 // =================== ROUTE USER ====================
 Route::prefix('user')->group(function () {
@@ -92,6 +93,9 @@ Route::prefix('lowongan')->middleware(['auth:perusahaan'])->group(function () {
     Route::put('/update-lowongan/{id}', [LowonganMagangController::class, 'update']);
     Route::delete('/delete-lowongan/{id}', [LowonganMagangController::class, 'destroy']);
 });
+
+// ==================== ROUTE PERUSAHAAN (PELAMAR) ====================
+Route::middleware('auth:perusahaan')->get('/perusahaan/pelamar', [PerusahaanController::class, 'listPelamar']);
 
 // ==================== ROUTE PELAMAR ====================
 Route::prefix('pelamar')->group(function () {

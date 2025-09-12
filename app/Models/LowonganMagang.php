@@ -22,6 +22,8 @@ class LowonganMagang extends Model
         'benefit',
         'status',
         'deadline_lamaran',
+        'periode_awal',
+        'periode_akhir',
     ];
 
     // Relasi ke Perusahaan
