@@ -9,12 +9,16 @@ class Pelamar extends Model
 {
     use HasFactory;
 
-    protected $table = 'lowongan_magang';
+    protected $table = 'pelamar';
 
-    // protected $fillable = [
-    //     'sekolah_id',
-    //     'nama_jurusan',
-    // ];
+    protected $fillable = [
+        'siswa_id',
+        'lowongan_id',
+        'tanggal_lamaran',
+        'status_lamaran',
+        'cv',
+        'transkrip',
+    ];
     public function siswa()
     {
         return $this->belongsTo(Siswa::class);
