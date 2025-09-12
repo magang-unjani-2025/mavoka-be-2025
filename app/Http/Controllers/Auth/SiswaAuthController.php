@@ -97,9 +97,12 @@ class SiswaAuthController extends Controller
             return response()->json(['message' => 'Siswa tidak ditemukan'], 404);
         }
         $data = $request->only(array_keys($request->all()));
-        $validator = Validator::make($data, [
+        $validator = Validator::make(array_merge($data, [
+            'foto_profil' => $request->file('foto_profil')
+        ]), [
             'username' => 'sometimes|required|unique:siswa,username,' . $id,
             'email' => 'sometimes|required|email|unique:siswa,email,' . $id,
+            'foto_profil' => 'sometimes|file|image|mimes:jpeg,png,jpg,gif|max:2048',
         ]);
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 422);
@@ -117,19 +120,18 @@ class SiswaAuthController extends Controller
                 $data['status_verifikasi'] = 'belum';
             }
         }
+        // Handle upload foto profil jika ada
+        if ($request->hasFile('foto_profil')) {
+            $path = $request->file('foto_profil')->store('siswa/foto', 'public');
+            $data['foto_profil'] = $path;
+        }
+
         $siswa->update($data);
         $siswa->refresh();
-        return response()->json(['message' => 'Siswa berhasil diupdate', 'siswa' => $siswa]);
-    }
-
-    // Delete data siswa
-    public function delete($id)
-    {
-        $siswa = Siswa::find($id);
-        if (!$siswa) {
-            return response()->json(['message' => 'Siswa tidak ditemukan'], 404);
-        }
-        $siswa->delete();
-        return response()->json(['message' => 'Siswa berhasil dihapus']);
+        return response()->json([
+            'message' => 'Siswa berhasil diupdate',
+            'siswa' => $siswa,
+            'foto_profil_url' => isset($siswa->foto_profil) ? asset('storage/' . $siswa->foto_profil) : null,
+        ]);
     }
 }

@@ -21,6 +21,7 @@ class Sekolah extends Authenticatable implements JWTSubject
         'tanggal_verifikasi',
         'nama_sekolah',
         'web_sekolah',
+        'logo_sekolah',
         'npsn',
         'jurusan',
         'kontak',

@@ -34,14 +34,15 @@ class LowonganMagangController extends Controller
             'lokasi_penempatan' => 'required|string',
             'persyaratan' => 'required|string',
             'benefit' => 'required|string',
-            'status' => 'required|in:buka,tutup',
+            'status' => 'nullable|in:aktif,tidak',
             'deadline_lamaran' => 'required|date',
         ]);
 
-        $lowongan = LowonganMagang::create([
+        $data = array_merge($validated, [
             'perusahaan_id' => $perusahaan->id,
-            ...$validated
+            'status' => ($validated['status'] ?? 'aktif')
         ]);
+        $lowongan = LowonganMagang::create($data);
 
         return response()->json(['message' => 'Lowongan berhasil dibuat', 'data' => $lowongan], 201);
     }
@@ -59,17 +60,19 @@ class LowonganMagangController extends Controller
         $perusahaan = JWTAuth::parseToken()->authenticate();
         $lowongan = LowonganMagang::where('perusahaan_id', $perusahaan->id)->findOrFail($id);
 
-        $lowongan->update($request->only([
-            'judul_lowongan',
-            'deskripsi',
-            'posisi',
-            'kuota',
-            'lokasi_penempatan',
-            'persyaratan',
-            'benefit',
-            'status',
-            'deadline_lamaran',
-        ]));
+        $fields = $request->only([
+            'judul_lowongan','deskripsi','posisi','kuota','lokasi_penempatan','persyaratan','benefit','status','deadline_lamaran'
+        ]);
+        // Jika kuota diupdate ke 0 atau sudah 0 -> status otomatis 'tidak'
+        if (array_key_exists('kuota', $fields)) {
+            if ((int)$fields['kuota'] <= 0) {
+                $fields['status'] = 'tidak';
+            } elseif (!isset($fields['status'])) {
+                // Jika kuota > 0 dan status tidak diset manual, tetap aktif
+                $fields['status'] = 'aktif';
+            }
+        }
+        $lowongan->update($fields);
 
         return response()->json(['message' => 'Lowongan berhasil diperbarui', 'data' => $lowongan]);
     }

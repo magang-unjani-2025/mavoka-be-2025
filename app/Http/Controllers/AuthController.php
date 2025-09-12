@@ -76,6 +76,11 @@ class AuthController extends Controller
     //Kirim ulang OTP
     public function resendOtp(Request $request, $role)
     {
+        // Validasi input email
+        $request->validate([
+            'email' => 'required|email',
+        ]);
+
         $model = match ($role) {
             'siswa' => Siswa::class,
             'sekolah' => Sekolah::class,
@@ -103,10 +108,20 @@ class AuthController extends Controller
         // Ambil nama dari field yang relevan
         $nama = $user->nama_lengkap ?? $user->nama_sekolah ?? $user->nama ?? 'Pengguna';
 
-        // Kirim ulang email OTP (dengan nama)
-        Mail::to($user->email)->send(new OtpMail($otp, $nama));
+        // Kirim ulang email OTP (dengan nama) tanpa mematahkan proses saat gagal
+        $emailStatus = 'sent';
+        try {
+            Mail::to($user->email)->send(new OtpMail($otp, $nama));
+        } catch (\Throwable $e) {
+            \Log::warning('Gagal mengirim email OTP (resend ' . $role . '): ' . $e->getMessage());
+            $emailStatus = 'failed';
+        }
 
-        return response()->json(['message' => 'OTP berhasil dikirim ulang']);
+        return response()->json([
+            'message' => 'OTP baru berhasil dibuat' . ($emailStatus === 'sent' ? ' dan dikirim ke email.' : ', namun pengiriman email gagal.'),
+            'email_status' => $emailStatus,
+            'expires_at' => $user->otp_expired_at,
+        ]);
     }
     // public function resendOtp(Request $request, $role)
     // {
@@ -147,6 +162,7 @@ class AuthController extends Controller
             'nama_sekolah' => 'required',
             'npsn' => 'required|unique:sekolah|min:8',
             'web_sekolah' => 'required',
+            'logo_sekolah' => 'sometimes|file|image|mimes:jpeg,png,jpg,gif|max:2048',
         ]);
 
         if ($validator->fails()) {
@@ -155,12 +171,19 @@ class AuthController extends Controller
 
         $otp = random_int(100000, 999999);
 
+        // Simpan logo jika dikirim
+        $logoPath = null;
+        if ($request->hasFile('logo_sekolah')) {
+            $logoPath = $request->file('logo_sekolah')->store('sekolah/logo', 'public');
+        }
+
         $sekolah = Sekolah::create([
             'username' => $request->username,
             'email' => $request->email,
             'password' => Hash::make($request->password),
             'nama_sekolah' => $request->nama_sekolah,
             'web_sekolah' => $request->web_sekolah,
+            'logo_sekolah' => $logoPath,
             'npsn' => $request->npsn,
             'kontak' => $request->kontak,
             'alamat' => $request->alamat,
@@ -170,12 +193,20 @@ class AuthController extends Controller
             'otp_expired_at' => now()->addMinutes(10),
         ]);
 
-        // $this->sendOtpEmail($request->email, $otp);
-        $this->sendOtpEmail($sekolah, $otp);
+        // Kirim OTP via email (jangan patahkan proses jika gagal kirim)
+        $emailStatus = 'sent';
+        try {
+            $this->sendOtpEmail($sekolah, $otp);
+        } catch (\Throwable $e) {
+            \Log::warning('Gagal mengirim email OTP (sekolah): ' . $e->getMessage());
+            $emailStatus = 'failed';
+        }
 
         return response()->json([
             'message' => 'Registrasi sekolah berhasil. Cek email untuk OTP.',
-            'data' => $sekolah
+            'data' => $sekolah,
+            'logo_url' => $sekolah->logo_sekolah ? asset('storage/' . $sekolah->logo_sekolah) : null,
+            'email_status' => $emailStatus,
         ]);
     }
 
@@ -266,13 +297,20 @@ class AuthController extends Controller
             'otp_expired_at' => now()->addMinutes(10),
         ]);
 
-        // $this->sendOtpEmail($request->email, $otp);
-        $this->sendOtpEmail($siswa, $otp);
+        // Kirim OTP, tapi jangan patahkan proses bila gagal
+        $emailStatus = 'sent';
+        try {
+            $this->sendOtpEmail($siswa, $otp);
+        } catch (\Throwable $e) {
+            \Log::warning('Gagal mengirim email OTP (siswaLengkapiRegistrasi): ' . $e->getMessage());
+            $emailStatus = 'failed';
+        }
 
 
         return response()->json([
             'message' => 'Data siswa berhasil diperbarui. Cek email untuk OTP.',
-            'data' => $siswa
+            'data' => $siswa,
+            'email_status' => $emailStatus,
         ]);
     }
 
@@ -316,13 +354,20 @@ class AuthController extends Controller
             'otp_expired_at' => $otpExpiredAt,
         ]);
 
-        // $this->sendOtpEmail($request->email, $otp);
-        $this->sendOtpEmail($perusahaan, $otp);
+        // Kirim OTP, tapi bila gagal jangan patahkan proses
+        $emailStatus = 'sent';
+        try {
+            $this->sendOtpEmail($perusahaan, $otp);
+        } catch (\Throwable $e) {
+            \Log::warning('Gagal mengirim email OTP (perusahaan): ' . $e->getMessage());
+            $emailStatus = 'failed';
+        }
 
 
         return response()->json([
             'message' => 'Registrasi perusahaan berhasil. Silakan cek email untuk OTP.',
-            'data' => $perusahaan
+            'data' => $perusahaan,
+            'email_status' => $emailStatus,
         ]);
     }
 
@@ -363,11 +408,19 @@ class AuthController extends Controller
 
         $nama = $lembaga->nama_lembaga ?? 'Pengguna';
 
-        $this->sendOtpEmail($lembaga, $otp);
+        // Kirim OTP, tapi bila gagal jangan patahkan proses
+        $emailStatus = 'sent';
+        try {
+            $this->sendOtpEmail($lembaga, $otp);
+        } catch (\Throwable $e) {
+            \Log::warning('Gagal mengirim email OTP (lembaga): ' . $e->getMessage());
+            $emailStatus = 'failed';
+        }
 
         return response()->json([
             'message' => 'Registrasi lembaga pelatihan berhasil. Cek email untuk OTP.',
-            'data' => $lembaga
+            'data' => $lembaga,
+            'email_status' => $emailStatus,
         ]);
     }
 
@@ -508,10 +561,20 @@ class AuthController extends Controller
         $user->otp_expired_at = now()->addMinutes(10);
         $user->save();
 
-        // Kirim email
-        $this->sendOtpEmail($user, $otp);
+        // Kirim email tanpa mematahkan proses saat gagal
+        $emailStatus = 'sent';
+        try {
+            $this->sendOtpEmail($user, $otp);
+        } catch (\Throwable $e) {
+            \Log::warning('Gagal mengirim email OTP (forgotPassword ' . $role . '): ' . $e->getMessage());
+            $emailStatus = 'failed';
+        }
 
-        return response()->json(['message' => 'OTP untuk reset password telah dikirim.']);
+        return response()->json([
+            'message' => $emailStatus === 'sent' ? 'OTP untuk reset password telah dikirim.' : 'OTP dibuat, namun pengiriman email gagal.',
+            'email_status' => $emailStatus,
+            'expires_at' => $user->otp_expired_at,
+        ]);
     }
 
     //Ganti Password

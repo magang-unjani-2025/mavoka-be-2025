@@ -10,12 +10,13 @@ use App\Http\Controllers\StatistikController;
 use App\Http\Controllers\LowonganMagangController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\Auth\SiswaAuthController;
+use App\Http\Controllers\PelamarController;
 
+// =================== ROUTE USER ====================
 Route::prefix('user')->group(function () {
     // Auth & register
     Route::post('/login/{role}', [LoginController::class, 'login']);
     Route::post('/logout', [LoginController::class, 'logout']);
-
     Route::post('/register/siswa', [AuthController::class, 'registerSiswa']);
     Route::post('/siswa/lengkapi-registrasi', [AuthController::class, 'siswaLengkapiRegistrasi']);
     Route::post('/register/sekolah', [AuthController::class, 'registerSekolah']);
@@ -45,42 +46,56 @@ Route::prefix('user')->group(function () {
     Route::get('/{role}/{id}', [UserController::class, 'getById']);
 });
 
+// =================== ROUTE SEKOLAH ====================
 Route::prefix('sekolah')->group(function () {
     Route::get('/all-sekolah', [SekolahController::class, 'getAllSekolah']);
     Route::get('/jurusan/{sekolah_id}', [SekolahController::class, 'getJurusanBySekolah']);
     Route::post('/create-jurusan', [JurusanController::class, 'store']);
     Route::post('/upload-siswa-single', [SekolahController::class, 'uploadSiswaSingle']);
     Route::post('/upload-siswa-bulk', [SekolahController::class, 'uploadSiswaBulk']);
+    // Endpoint untuk melihat status lamaran siswa berdasarkan sekolah
+    Route::get('/lamaran-siswa/{sekolah_id}', [SekolahController::class, 'getLamaranSiswaBySekolah']);
+    // Upload logo sekolah
+    Route::post('/{sekolah_id}/upload-logo', [SekolahController::class, 'uploadLogoSekolah']);
 });
 
+// =================== ROUTE SISWA ====================
 Route::prefix('siswa')->group(function () {
     Route::get('/all', [SiswaAuthController::class, 'getAll']);
     Route::get('/{id}', [SiswaAuthController::class, 'getById']);
     Route::put('/update/{id}', [SiswaAuthController::class, 'update']);
-    Route::delete('/delete/{id}', [SiswaAuthController::class, 'delete']);
 });
 
+// =================== ROUTE VERIFIKASI ====================
 Route::middleware('auth:admin')->put('/verifikasi/{role}/{id}', [VerifikasiController::class, 'verifikasiAkun']);
 
+// =================== ROUTE STATISTIK ====================
 Route::prefix('statistik')->group(function () {
-
     Route::get('/siswa', [StatistikController::class, 'totalSiswa']);
     Route::get('/sekolah', [StatistikController::class, 'totalSekolah']);
     Route::get('/perusahaan', [StatistikController::class, 'totalPerusahaan']);
     Route::get('/lpk', [StatistikController::class, 'totalLembagaPelatihan']);
-
     Route::get('/bulanan/{role}', [StatistikController::class, 'statistikBulanan']);
     Route::get('/tahunan/{role}', [StatistikController::class, 'statistikTahunan']);
 });
 
+// =================== ROUTE LOWONGAN MAGANG ====================
 Route::prefix('lowongan')->group(function () {
     Route::get('/all-lowongan', [LowonganMagangController::class, 'listAll']);
     Route::get('/show-lowongan/{id}', [LowonganMagangController::class, 'detail']);
 });
 
+// =================== ROUTE LOWONGAN MAGANG TOKEN PERUSAHAAN ====================
 Route::prefix('lowongan')->middleware(['auth:perusahaan'])->group(function () {
     Route::get('/lowongan-perusahaan', [LowonganMagangController::class, 'index']);
     Route::post('/create-lowongan', [LowonganMagangController::class, 'store']);
     Route::put('/update-lowongan/{id}', [LowonganMagangController::class, 'update']);
     Route::delete('/delete-lowongan/{id}', [LowonganMagangController::class, 'destroy']);
+});
+
+// ==================== ROUTE PELAMAR ====================
+Route::prefix('pelamar')->group(function () {
+    Route::post('/', [PelamarController::class, 'store']);
+    Route::put('/{id}/status', [PelamarController::class, 'updateStatus']);
+    Route::post('/{id}/respond-penawaran', [PelamarController::class, 'respondPenawaran']);
 });
