@@ -26,11 +26,10 @@ Route::prefix('user')->group(function () {
     Route::post('/verify-otp/{role}', [AuthController::class, 'verifyOTP']);
     Route::post('/resend-otp/{role}', [AuthController::class, 'resendOtp']);
 
-    // Update akun (middleware sesuai role)
-    Route::middleware('auth:siswa')->put('/update-akun/{role}/{id}', [AuthController::class, 'updateAccount']);
-    Route::middleware('auth:sekolah')->put('/update-akun/{role}/{id}', [AuthController::class, 'updateAccount']);
-    Route::middleware('auth:perusahaan')->put('/update-akun/{role}/{id}', [AuthController::class, 'updateAccount']);
-    Route::middleware('auth:lpk')->put('/update-akun/{role}/{id}', [AuthController::class, 'updateAccount']);
+    // Update akun: HANYA PUT/PATCH dengan JSON (jangan multipart PUT karena tidak diparse oleh PHP).
+    // Untuk upload file gunakan endpoint khusus (bisa ditambahkan terpisah) atau POST override _method kalau dibutuhkan.
+    Route::middleware('auth:siswa,sekolah,perusahaan,lpk')
+        ->match(['put','patch', 'post'],'/update-akun/{role}/{id}', [AuthController::class, 'updateAccount']);
 
     // Get all akun
     Route::get('/show-akun/{role}', [AuthController::class, 'getAllAccounts']);

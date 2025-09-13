@@ -428,6 +428,7 @@ class AuthController extends Controller
     // Edit Akun
     public function updateAccount(Request $request, $role, $id)
     {
+        // Validasi role -> model
         $model = match ($role) {
             'siswa' => Siswa::class,
             'sekolah' => Sekolah::class,
@@ -435,18 +436,38 @@ class AuthController extends Controller
             'lpk' => LembagaPelatihan::class,
             default => null,
         };
-
         if (!$model) {
             return response()->json(['message' => 'Role tidak valid.'], 400);
         }
 
-        $authUser = auth($role)->user();
+        // DETEKSI GUARD YANG AKTIF (karena route sekarang multi guard)
+        $guards = ['siswa', 'sekolah', 'perusahaan', 'lpk'];
+        $activeGuard = null;
+        $authUser = null;
+        foreach ($guards as $g) {
+            if (auth($g)->check()) {
+                $activeGuard = $g;
+                $authUser = auth($g)->user();
+                break;
+            }
+        }
         if (!$authUser) {
-            return response()->json(['message' => 'Unauthenticated.'], 401);
+            return response()->json(['message' => 'Unauthenticated (token tidak dikenali).'], 401);
+        }
+
+        // Pastikan token guard cocok dengan role path
+        if ($activeGuard !== $role) {
+            return response()->json([
+                'message' => 'Token tidak sesuai dengan role path.',
+                'detail' => [
+                    'expected_role' => $role,
+                    'token_role' => $activeGuard,
+                ]
+            ], 403);
         }
 
         if ($authUser->id != $id) {
-            return response()->json(['message' => 'Akses ditolak.'], 403);
+            return response()->json(['message' => 'Akses ditolak (id tidak cocok).'], 403);
         }
 
         $user = $model::find($id);
@@ -454,22 +475,130 @@ class AuthController extends Controller
             return response()->json(['message' => 'Data tidak ditemukan.'], 404);
         }
 
+        // Field yang boleh diupdate per role
         $allowedFields = match ($role) {
-            'sekolah' => ['username', 'password', 'alamat', 'kontak'],
+            'sekolah' => ['username', 'password', 'alamat', 'kontak', 'logo_sekolah'],
             'siswa' => ['username', 'password', 'tanggal_lahir', 'alamat', 'kontak', 'jenis_kelamin', 'foto_profil'],
             'perusahaan' => ['username', 'password', 'deskripsi_usaha', 'alamat', 'kontak', 'logo_perusahaan', 'penanggung_jawab'],
             'lpk' => ['username', 'password', 'deskripsi_lembaga', 'alamat', 'kontak', 'logo_lembaga', 'status_akreditasi', 'dokumen_akreditasi'],
         };
 
-        $data = $request->only($allowedFields);
-
-        if ($request->filled('password')) {
-            $data['password'] = Hash::make($request->password);
+        // Validasi minimal (opsional): username unik jika dikirim
+        $rules = [];
+        if ($request->filled('username')) {
+            $rules['username'] = 'unique:' . $user->getTable() . ',username,' . $user->id;
+        }
+        if ($request->has('password')) {
+            // Boleh kosong? Jika user tidak ingin ubah password kirimkan field kosong akan diabaikan nanti
+            if (trim($request->password) !== '') {
+                $rules['password'] = 'min:6';
+            }
+        }
+        if (!empty($rules)) {
+            $validator = Validator::make($request->all(), $rules);
+            if ($validator->fails()) {
+                return response()->json(['message' => 'Validasi gagal', 'errors' => $validator->errors()], 422);
+            }
         }
 
-        $user->update($data);
+        // Ambil payload (prioritas: parsed request -> json() -> raw body decode)
+        $incoming = $request->all(); // inisialisasi awal
+        if (empty($incoming)) {
+            $jsonPayload = $request->json()->all();
+            if (!empty($jsonPayload)) {
+                $incoming = $jsonPayload;
+            } else {
+                // Coba manual decode raw body
+                $raw = $request->getContent();
+                if ($raw) {
+                    $decoded = json_decode($raw, true);
+                    if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                        $incoming = $decoded;
+                    }
+                }
+            }
+        }
 
-        return response()->json(['message' => 'Akun berhasil diperbarui', 'data' => $user]);
+        // Tentukan field yang benar-benar dikirim: gunakan array_key_exists agar nilai null tetap dianggap hadir
+        $presentData = [];
+        foreach ($allowedFields as $field) {
+            if (array_key_exists($field, $incoming)) {
+                $presentData[$field] = $incoming[$field];
+            }
+        }
+
+        // Normalisasi: ubah string kosong menjadi null (agar bisa benar-benar kosongkan kolom)
+        foreach ($presentData as $k => $v) {
+            if (is_string($v) && trim($v) === '') {
+                $presentData[$k] = null;
+            }
+        }
+
+        // Handle file upload jika ada
+        $fileFields = [
+            'logo_sekolah' => 'sekolah/logo',
+            'foto_profil' => 'siswa/foto',
+            'logo_perusahaan' => 'perusahaan/logo',
+            'logo_lembaga' => 'lpk/logo',
+            'dokumen_akreditasi' => 'lpk/dokumen',
+        ];
+        foreach ($fileFields as $input => $folder) {
+            if ($request->hasFile($input)) {
+                $path = $request->file($input)->store($folder, 'public');
+                $presentData[$input] = $path;
+            }
+        }
+
+        if (array_key_exists('password', $presentData)) {
+            if ($presentData['password'] === null || trim((string)$presentData['password']) === '') {
+                unset($presentData['password']); // jangan ubah
+            } else {
+                $presentData['password'] = Hash::make($presentData['password']);
+            }
+        }
+
+        // Force update semua field yang dikirim (tanpa diff) karena sebelumnya ada kasus field tidak terdeteksi
+        $dirtyBeforeSave = [];
+        if (!empty($presentData)) {
+            $user->fill($presentData);
+            $dirtyBeforeSave = $user->getDirty();
+            if (!empty($dirtyBeforeSave)) {
+                $user->save();
+            }
+        }
+
+        $user->refresh();
+
+        // Tambah URL file jika ada (post-refresh)
+        foreach (['logo_sekolah','foto_profil','logo_perusahaan','logo_lembaga','dokumen_akreditasi'] as $f) {
+            if ($user->{$f} ?? null) {
+                $user->{$f . '_url'} = asset('storage/' . $user->{$f});
+            }
+        }
+
+        // Logging debug (aktifkan dengan ?debug=1)
+        if ($request->query('debug') == 1) {
+            \Log::info('UPDATE_ACCOUNT_DEBUG', [
+                'role' => $role,
+                'user_id' => $id,
+                'active_guard' => $activeGuard,
+                'request_all' => $request->all(),
+                'raw_content' => $request->getContent(),
+                'incoming_after_merge' => $incoming,
+                'allowed_fields' => $allowedFields,
+                'present_data' => $presentData,
+                'dirty_before_save' => $dirtyBeforeSave,
+            ]);
+        }
+
+        return response()->json([
+            'message' => empty($dirtyBeforeSave) ? 'Tidak ada perubahan data (nilai sama atau tidak ada field dikirim).' : 'Akun berhasil diperbarui',
+            'role' => $role,
+            'guard' => $activeGuard,
+            'updated_fields' => array_keys($dirtyBeforeSave),
+            'sent_fields' => array_keys($presentData),
+            'data' => $user,
+        ]);
     }
 
 
