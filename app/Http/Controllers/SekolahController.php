@@ -20,6 +20,38 @@ class SekolahController extends Controller
         return response()->json(Sekolah::all());
     }
 
+    // 🟢 Public: detail sekolah + jurusan
+    public function detail($id)
+    {
+        $sekolah = Sekolah::with(['jurusan' => function($q){
+            $q->select('id','sekolah_id','nama_jurusan');
+        }])->find($id);
+
+        if (!$sekolah) {
+            return response()->json(['message' => 'Sekolah tidak ditemukan'], 404);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'id' => $sekolah->id,
+                'nama_sekolah' => $sekolah->nama_sekolah,
+                'web_sekolah' => $sekolah->web_sekolah,
+                'npsn' => $sekolah->npsn,
+                'logo_sekolah' => $sekolah->logo_sekolah,
+                'kontak' => $sekolah->kontak,
+                'alamat' => $sekolah->alamat,
+                'jumlah_jurusan' => $sekolah->jurusan->count(),
+                'jurusan' => $sekolah->jurusan->map(function($j){
+                    return [
+                        'id' => $j->id,
+                        'nama_jurusan' => $j->nama_jurusan,
+                    ];
+                })
+            ]
+        ]);
+    }
+
     public function getJurusanBySekolah($sekolah_id)
     {
         $jurusan = Jurusan::where('sekolah_id', $sekolah_id)->get();

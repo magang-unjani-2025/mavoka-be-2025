@@ -40,4 +40,10 @@ class LembagaPelatihan extends Authenticatable implements JWTSubject
     public function getJWTCustomClaims() {
         return [];
     }
+
+    // Relasi ke Pelatihan (LPK memiliki banyak pelatihan)
+    public function pelatihan()
+    {
+        return $this->hasMany(Pelatihan::class, 'lembaga_id');
+    }
 }

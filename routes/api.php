@@ -12,8 +12,10 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\Auth\SiswaAuthController;
 use App\Http\Controllers\PelamarController;
 use App\Http\Controllers\PerusahaanController;
+use App\Http\Controllers\PelatihanController;
+use App\Http\Controllers\LembagaPelatihanController;
 
-// =================== ROUTE USER ====================
+// =================== ROUTE USER (AUTH, REGISTER, ACCOUNT MGMT) ====================
 Route::prefix('user')->group(function () {
     // Auth & register
     Route::post('/login/{role}', [LoginController::class, 'login']);
@@ -26,50 +28,48 @@ Route::prefix('user')->group(function () {
     Route::post('/verify-otp/{role}', [AuthController::class, 'verifyOTP']);
     Route::post('/resend-otp/{role}', [AuthController::class, 'resendOtp']);
 
-    // Update akun: HANYA PUT/PATCH dengan JSON (jangan multipart PUT karena tidak diparse oleh PHP).
-    // Untuk upload file gunakan endpoint khusus (bisa ditambahkan terpisah) atau POST override _method kalau dibutuhkan.
+    // Update akun berbagai role (PUT/PATCH/POST override)
     Route::middleware('auth:siswa,sekolah,perusahaan,lpk')
         ->match(['put','patch', 'post'],'/update-akun/{role}/{id}', [AuthController::class, 'updateAccount']);
 
-    // Get all akun
+    // List akun per role & khusus siswa via admin
     Route::get('/show-akun/{role}', [AuthController::class, 'getAllAccounts']);
     Route::middleware('auth:admin')->get('/show-akun/siswa', [AuthController::class, 'getAllAccounts']);
 
-    // Delete akun
+    // Hapus akun
     Route::delete('/delete-akun/{role}/{id}', [AuthController::class, 'deleteAccount']);
 
     // Forgot / reset password
     Route::post('/forgot-password/{role}', [AuthController::class, 'forgotPassword']);
     Route::post('/reset-password/{role}', [AuthController::class, 'resetPassword']);
 
-    // *Get akun by ID (semua role)*
+    // Get akun by ID (semua role)
     Route::get('/{role}/{id}', [UserController::class, 'getById']);
 });
 
-// =================== ROUTE SEKOLAH ====================
+// =================== ROUTE SEKOLAH (DATA & UPLOAD) ====================
 Route::prefix('sekolah')->group(function () {
     Route::get('/all-sekolah', [SekolahController::class, 'getAllSekolah']);
+    Route::get('/detail/{id}', [SekolahController::class, 'detail']);
     Route::get('/jurusan/{sekolah_id}', [SekolahController::class, 'getJurusanBySekolah']);
     Route::post('/create-jurusan', [JurusanController::class, 'store']);
     Route::post('/upload-siswa-single', [SekolahController::class, 'uploadSiswaSingle']);
     Route::post('/upload-siswa-bulk', [SekolahController::class, 'uploadSiswaBulk']);
-    // Endpoint untuk melihat status lamaran siswa berdasarkan sekolah
     Route::get('/lamaran-siswa/{sekolah_id}', [SekolahController::class, 'getLamaranSiswaBySekolah']);
-    // Upload logo sekolah
     Route::post('/{sekolah_id}/upload-logo', [SekolahController::class, 'uploadLogoSekolah']);
 });
 
-// =================== ROUTE SISWA ====================
+// =================== ROUTE SISWA (PROFILE & DATA) ====================
 Route::prefix('siswa')->group(function () {
     Route::get('/all', [SiswaAuthController::class, 'getAll']);
     Route::get('/{id}', [SiswaAuthController::class, 'getById']);
     Route::put('/update/{id}', [SiswaAuthController::class, 'update']);
 });
 
-// =================== ROUTE VERIFIKASI ====================
+// =================== ROUTE VERIFIKASI (ADMIN ONLY) ====================
 Route::middleware('auth:admin')->put('/verifikasi/{role}/{id}', [VerifikasiController::class, 'verifikasiAkun']);
 
-// =================== ROUTE STATISTIK ====================
+// =================== ROUTE STATISTIK (AGGREGATION) ====================
 Route::prefix('statistik')->group(function () {
     Route::get('/siswa', [StatistikController::class, 'totalSiswa']);
     Route::get('/sekolah', [StatistikController::class, 'totalSekolah']);
@@ -79,26 +79,46 @@ Route::prefix('statistik')->group(function () {
     Route::get('/tahunan/{role}', [StatistikController::class, 'statistikTahunan']);
 });
 
-// =================== ROUTE LOWONGAN MAGANG ====================
+// =================== ROUTE LOWONGAN MAGANG (PUBLIC) ====================
 Route::prefix('lowongan')->group(function () {
     Route::get('/all-lowongan', [LowonganMagangController::class, 'listAll']);
     Route::get('/show-lowongan/{id}', [LowonganMagangController::class, 'detail']);
 });
 
-// =================== ROUTE LOWONGAN MAGANG TOKEN PERUSAHAAN ====================
+// =================== ROUTE PERUSAHAAN (PUBLIC DETAIL) ====================
+Route::get('/perusahaan/detail/{id}', [PerusahaanController::class, 'detail']);
+
+// =================== ROUTE LEMBAGA PELATIHAN (PUBLIC DETAIL) ====================
+Route::get('/lpk/detail/{id}', [LembagaPelatihanController::class, 'detail']);
+
+// =================== ROUTE LOWONGAN MAGANG (PERUSAHAAN AUTH) ====================
 Route::prefix('lowongan')->middleware(['auth:perusahaan'])->group(function () {
     Route::get('/lowongan-perusahaan', [LowonganMagangController::class, 'index']);
     Route::post('/create-lowongan', [LowonganMagangController::class, 'store']);
-    Route::put('/update-lowongan/{id}', [LowonganMagangController::class, 'update']);
+    Route::post('/update-lowongan/{id}', [LowonganMagangController::class, 'update']);
     Route::delete('/delete-lowongan/{id}', [LowonganMagangController::class, 'destroy']);
 });
 
-// ==================== ROUTE PERUSAHAAN (PELAMAR) ====================
+// ==================== ROUTE PERUSAHAAN (DAFTAR PELAMAR) ====================
 Route::middleware('auth:perusahaan')->get('/perusahaan/pelamar', [PerusahaanController::class, 'listPelamar']);
 
-// ==================== ROUTE PELAMAR ====================
+// ==================== ROUTE PELAMAR (LAMARAN) ====================
 Route::prefix('pelamar')->group(function () {
     Route::post('/', [PelamarController::class, 'store']);
     Route::put('/{id}/status', [PelamarController::class, 'updateStatus']);
     Route::post('/{id}/respond-penawaran', [PelamarController::class, 'respondPenawaran']);
+});
+
+// =================== ROUTE PELATIHAN (PUBLIC) ====================
+Route::prefix('pelatihan')->group(function () {
+    Route::get('/all', [PelatihanController::class, 'listAll']);
+    Route::get('/detail/{id}', [PelatihanController::class, 'detail']);
+});
+
+// =================== ROUTE PELATIHAN (LPK AUTH) ====================
+Route::prefix('pelatihan')->middleware(['auth:lpk'])->group(function () {
+    Route::get('/mine', [PelatihanController::class, 'index']);
+    Route::post('/create', [PelatihanController::class, 'store']);
+    Route::put('/update/{id}', [PelatihanController::class, 'update']);
+    Route::delete('/delete/{id}', [PelatihanController::class, 'destroy']);
 });
