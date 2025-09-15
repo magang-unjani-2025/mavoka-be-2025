@@ -13,6 +13,7 @@ use App\Http\Controllers\Auth\SiswaAuthController;
 use App\Http\Controllers\PelamarController;
 use App\Http\Controllers\PerusahaanController;
 use App\Http\Controllers\PelatihanController;
+use App\Http\Controllers\LembagaPelatihanController;
 
 // =================== ROUTE USER (AUTH, REGISTER, ACCOUNT MGMT) ====================
 Route::prefix('user')->group(function () {
@@ -49,6 +50,7 @@ Route::prefix('user')->group(function () {
 // =================== ROUTE SEKOLAH (DATA & UPLOAD) ====================
 Route::prefix('sekolah')->group(function () {
     Route::get('/all-sekolah', [SekolahController::class, 'getAllSekolah']);
+    Route::get('/detail/{id}', [SekolahController::class, 'detail']);
     Route::get('/jurusan/{sekolah_id}', [SekolahController::class, 'getJurusanBySekolah']);
     Route::post('/create-jurusan', [JurusanController::class, 'store']);
     Route::post('/upload-siswa-single', [SekolahController::class, 'uploadSiswaSingle']);
@@ -83,11 +85,17 @@ Route::prefix('lowongan')->group(function () {
     Route::get('/show-lowongan/{id}', [LowonganMagangController::class, 'detail']);
 });
 
+// =================== ROUTE PERUSAHAAN (PUBLIC DETAIL) ====================
+Route::get('/perusahaan/detail/{id}', [PerusahaanController::class, 'detail']);
+
+// =================== ROUTE LEMBAGA PELATIHAN (PUBLIC DETAIL) ====================
+Route::get('/lpk/detail/{id}', [LembagaPelatihanController::class, 'detail']);
+
 // =================== ROUTE LOWONGAN MAGANG (PERUSAHAAN AUTH) ====================
 Route::prefix('lowongan')->middleware(['auth:perusahaan'])->group(function () {
     Route::get('/lowongan-perusahaan', [LowonganMagangController::class, 'index']);
     Route::post('/create-lowongan', [LowonganMagangController::class, 'store']);
-    Route::put('/update-lowongan/{id}', [LowonganMagangController::class, 'update']);
+    Route::post('/update-lowongan/{id}', [LowonganMagangController::class, 'update']);
     Route::delete('/delete-lowongan/{id}', [LowonganMagangController::class, 'destroy']);
 });
 
@@ -111,6 +119,6 @@ Route::prefix('pelatihan')->group(function () {
 Route::prefix('pelatihan')->middleware(['auth:lpk'])->group(function () {
     Route::get('/mine', [PelatihanController::class, 'index']);
     Route::post('/create', [PelatihanController::class, 'store']);
-    Route::post('/update/{id}', [PelatihanController::class, 'update']);
+    Route::put('/update/{id}', [PelatihanController::class, 'update']);
     Route::delete('/delete/{id}', [PelatihanController::class, 'destroy']);
 });

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\LowonganMagang;
 use Tymon\JWTAuth\Facades\JWTAuth;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 class LowonganMagangController extends Controller
 {
@@ -59,24 +60,87 @@ class LowonganMagangController extends Controller
 
     public function update(Request $request, $id)
     {
-        $perusahaan = JWTAuth::parseToken()->authenticate();
-        $lowongan = LowonganMagang::where('perusahaan_id', $perusahaan->id)->findOrFail($id);
+        try {
+            $perusahaan = JWTAuth::parseToken()->authenticate();
+            $lowongan = LowonganMagang::where('perusahaan_id', $perusahaan->id)->findOrFail($id);
 
-        $fields = $request->only([
-            'judul_lowongan','deskripsi','posisi','kuota','lokasi_penempatan','persyaratan','benefit','status','deadline_lamaran','periode_awal','periode_akhir'
-        ]);
-        // Jika kuota diupdate ke 0 atau sudah 0 -> status otomatis 'tidak'
-        if (array_key_exists('kuota', $fields)) {
-            if ((int)$fields['kuota'] <= 0) {
-                $fields['status'] = 'tidak';
-            } elseif (!isset($fields['status'])) {
-                // Jika kuota > 0 dan status tidak diset manual, tetap aktif
-                $fields['status'] = 'aktif';
+            // Ambil hanya field yang diizinkan
+            $payload = $request->only([
+                'judul_lowongan','deskripsi','posisi','kuota','lokasi_penempatan','persyaratan','benefit','status','deadline_lamaran','periode_awal','periode_akhir'
+            ]);
+
+            if (empty(array_filter($payload, fn($v) => $v !== null && $v !== ''))) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Tidak ada data yang dikirim untuk diperbarui'
+                ], 422);
             }
-        }
-        $lowongan->update($fields);
 
-        return response()->json(['message' => 'Lowongan berhasil diperbarui', 'data' => $lowongan]);
+            // Validation: only validate fields that are present (sometimes)
+            $rules = [
+                'judul_lowongan' => 'sometimes|string',
+                'deskripsi' => 'sometimes|string',
+                'posisi' => 'sometimes|string',
+                'kuota' => 'sometimes|integer|min:0',
+                'lokasi_penempatan' => 'sometimes|string',
+                'persyaratan' => 'sometimes|string',
+                'benefit' => 'sometimes|string',
+                'status' => 'sometimes|in:aktif,tidak',
+                'deadline_lamaran' => 'sometimes|date',
+                'periode_awal' => 'sometimes|date',
+                'periode_akhir' => 'sometimes|date',
+            ];
+
+            $validated = $request->validate($rules);
+
+            // Jika periode_awal / periode_akhir keduanya ada atau salah satunya berubah -> validasi konsistensi urutan
+            $periode_awal = $validated['periode_awal'] ?? $lowongan->periode_awal;
+            $periode_akhir = $validated['periode_akhir'] ?? $lowongan->periode_akhir;
+            if ($periode_awal && $periode_akhir && strtotime($periode_akhir) < strtotime($periode_awal)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'periode_akhir harus setelah atau sama dengan periode_awal'
+                ], 422);
+            }
+
+            // Logika kuota & status otomatis
+            if (array_key_exists('kuota', $validated)) {
+                if ((int)$validated['kuota'] <= 0) {
+                    $validated['status'] = 'tidak';
+                } else {
+                    // Hanya set aktif jika status tidak dikirim eksplisit
+                    if (!array_key_exists('status', $validated)) {
+                        $validated['status'] = 'aktif';
+                    }
+                }
+            }
+
+            // Hindari update jika tidak ada perubahan nyata
+            $dirtyInput = collect($validated)->filter(function($value, $key) use ($lowongan) {
+                return $lowongan->{$key} != $value; // loose comparison cukup di sini
+            })->all();
+
+            if (empty($dirtyInput)) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Tidak ada perubahan (data sama)',
+                    'data' => $lowongan
+                ]);
+            }
+
+            $lowongan->update($dirtyInput);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Lowongan berhasil diperbarui',
+                'data' => $lowongan->fresh('perusahaan')
+            ]);
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Lowongan tidak ditemukan untuk perusahaan Anda'
+            ], 404);
+        }
     }
 
     public function destroy($id)
