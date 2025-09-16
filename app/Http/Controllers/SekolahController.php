@@ -37,6 +37,7 @@ class SekolahController extends Controller
                 'id' => $sekolah->id,
                 'nama_sekolah' => $sekolah->nama_sekolah,
                 'web_sekolah' => $sekolah->web_sekolah,
+                'email' => $sekolah->email,
                 'npsn' => $sekolah->npsn,
                 'logo_sekolah' => $sekolah->logo_sekolah,
                 'kontak' => $sekolah->kontak,
