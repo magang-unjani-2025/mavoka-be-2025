@@ -13,6 +13,7 @@ use App\Http\Controllers\Auth\SiswaAuthController;
 use App\Http\Controllers\PelamarController;
 use App\Http\Controllers\PerusahaanController;
 use App\Http\Controllers\PelatihanController;
+use App\Http\Controllers\BatchController;
 use App\Http\Controllers\LembagaPelatihanController;
 
 // =================== ROUTE USER (AUTH, REGISTER, ACCOUNT MGMT) ====================
@@ -113,6 +114,9 @@ Route::prefix('pelamar')->group(function () {
 Route::prefix('pelatihan')->group(function () {
     Route::get('/all', [PelatihanController::class, 'listAll']);
     Route::get('/detail/{id}', [PelatihanController::class, 'detail']);
+    // Batch public
+    Route::get('/{pelatihanId}/batch', [BatchController::class, 'listByPelatihan']);
+    Route::get('/batch/detail/{id}', [BatchController::class, 'detail']);
 });
 
 // =================== ROUTE PELATIHAN (LPK AUTH) ====================
@@ -121,4 +125,9 @@ Route::prefix('pelatihan')->middleware(['auth:lpk'])->group(function () {
     Route::post('/create', [PelatihanController::class, 'store']);
     Route::put('/update/{id}', [PelatihanController::class, 'update']);
     Route::delete('/delete/{id}', [PelatihanController::class, 'destroy']);
+    // Batch CRUD (LPK only)
+    Route::get('/{pelatihanId}/batch', [BatchController::class, 'index']);
+    Route::post('/{pelatihanId}/batch', [BatchController::class, 'store']);
+    Route::post('/{pelatihanId}/batch/{id}', [BatchController::class, 'update']);
+    Route::delete('/{pelatihanId}/batch/{id}', [BatchController::class, 'destroy']);
 });
