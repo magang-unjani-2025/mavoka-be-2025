@@ -35,6 +35,7 @@ class LowonganMagangController extends Controller
             'lokasi_penempatan' => 'required|string',
             'persyaratan' => 'required|string',
             'benefit' => 'required|string',
+            'tugas_tanggung_jawab' => 'nullable|string',
             'status' => 'nullable|in:aktif,tidak',
             'deadline_lamaran' => 'required|date',
             'periode_awal' => 'required|date',
@@ -66,7 +67,7 @@ class LowonganMagangController extends Controller
 
             // Ambil hanya field yang diizinkan
             $payload = $request->only([
-                'judul_lowongan','deskripsi','posisi','kuota','lokasi_penempatan','persyaratan','benefit','status','deadline_lamaran','periode_awal','periode_akhir'
+                'judul_lowongan','deskripsi','posisi','kuota','lokasi_penempatan','persyaratan','benefit','tugas_tanggung_jawab','status','deadline_lamaran','periode_awal','periode_akhir'
             ]);
 
             if (empty(array_filter($payload, fn($v) => $v !== null && $v !== ''))) {
@@ -85,6 +86,7 @@ class LowonganMagangController extends Controller
                 'lokasi_penempatan' => 'sometimes|string',
                 'persyaratan' => 'sometimes|string',
                 'benefit' => 'sometimes|string',
+                'tugas_tanggung_jawab' => 'sometimes|string',
                 'status' => 'sometimes|in:aktif,tidak',
                 'deadline_lamaran' => 'sometimes|date',
                 'periode_awal' => 'sometimes|date',

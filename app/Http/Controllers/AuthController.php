@@ -7,7 +7,6 @@ use App\Models\Siswa;
 use App\Models\Sekolah;
 use App\Models\Perusahaan;
 use App\Models\LembagaPelatihan;
-use App\Models\Jurusan;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
@@ -232,20 +231,12 @@ class AuthController extends Controller
             return response()->json(['message' => 'Sekolah tidak ditemukan.'], 404);
         }
 
-        // 2. Cari jurusan dari nama jurusan + sekolah_id
-        $jurusan = Jurusan::where('sekolah_id', $sekolah->id)
-            ->where('nama_jurusan', $request->nama_jurusan)
-            ->first();
-        if (!$jurusan) {
-            return response()->json(['message' => 'Jurusan tidak ditemukan.'], 404);
-        }
-
         // 3. Simpan siswa
         $siswa = Siswa::create([
             'nisn' => $request->nisn,
             'sekolah_id' => $sekolah->id,
             'kelas' => $request->kelas,
-            'jurusan_id' => $jurusan->id,
+            'jurusan' => $request->nama_jurusan,
             'tahun_ajaran' => $request->tahun_ajaran,
             'status_verifikasi' => 'sudah',
             'tanggal_verifikasi' => now(),
@@ -624,7 +615,7 @@ class AuthController extends Controller
         $query = $model::query();
 
         if ($role === 'siswa') {
-            $query->with(['sekolah', 'jurusan']);
+            $query->with(['sekolah']);
         }
 
         return response()->json([

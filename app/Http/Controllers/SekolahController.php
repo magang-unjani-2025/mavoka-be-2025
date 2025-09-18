@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\Sekolah;
-use App\Models\Jurusan;
 use App\Models\Siswa;
 use Illuminate\Http\Request;
 use Maatwebsite\Excel\Facades\Excel;
@@ -20,12 +19,10 @@ class SekolahController extends Controller
         return response()->json(Sekolah::all());
     }
 
-    // 🟢 Public: detail sekolah + jurusan
+    // 🟢 Public: detail sekolah (tanpa tabel jurusan; jurusan per siswa kini string)
     public function detail($id)
     {
-        $sekolah = Sekolah::with(['jurusan' => function($q){
-            $q->select('id','sekolah_id','nama_jurusan');
-        }])->find($id);
+        $sekolah = Sekolah::find($id);
 
         if (!$sekolah) {
             return response()->json(['message' => 'Sekolah tidak ditemukan'], 404);
@@ -42,27 +39,12 @@ class SekolahController extends Controller
                 'logo_sekolah' => $sekolah->logo_sekolah,
                 'kontak' => $sekolah->kontak,
                 'alamat' => $sekolah->alamat,
-                'jumlah_jurusan' => $sekolah->jurusan->count(),
-                'jurusan' => $sekolah->jurusan->map(function($j){
-                    return [
-                        'id' => $j->id,
-                        'nama_jurusan' => $j->nama_jurusan,
-                    ];
-                })
+                // jurusan kini dikelola di entitas siswa (string per siswa)
             ]
         ]);
     }
 
-    public function getJurusanBySekolah($sekolah_id)
-    {
-        $jurusan = Jurusan::where('sekolah_id', $sekolah_id)->get();
-
-        if ($jurusan->isEmpty()) {
-            return response()->json(['message' => 'Tidak ada jurusan yang terdaftar untuk sekolah ini.'], 404);
-        }
-
-        return response()->json($jurusan);
-    }
+    // getJurusanBySekolah dihapus, karena tabel jurusan ditiadakan.
 
     // Upload logo sekolah
     public function uploadLogoSekolah(Request $request, $sekolah_id)
@@ -106,7 +88,7 @@ class SekolahController extends Controller
             return response()->json(['message' => 'Status filter tidak valid'], 422);
         }
 
-        $query = Siswa::where('sekolah_id', $sekolah_id)->with(['lamaran.lowongan', 'jurusan']);
+    $query = Siswa::where('sekolah_id', $sekolah_id)->with(['lamaran.lowongan']);
 
         // Jika filter 'belum', ambil siswa tanpa lamaran
         if ($status === 'belum') {
@@ -131,7 +113,7 @@ class SekolahController extends Controller
                 'nama_lengkap' => $s->nama_lengkap,
                 'nisn' => $s->nisn,
                 'kelas' => $s->kelas,
-                'jurusan' => $s->jurusan ? $s->jurusan->nama_jurusan : null,
+                'jurusan' => $s->jurusan,
                 'jumlah_lamaran' => $s->lamaran->count(),
                 'lamaran' => $lamaran->map(function ($l) {
                     return [
@@ -183,8 +165,8 @@ class SekolahController extends Controller
             $data['password'] = null;
         }
 
-        // Cari jurusan_id berdasarkan nama_jurusan dan sekolah_id
-        $jurusan_id = null;
+    // Perubahan skema: kolom jurusan sekarang string pada tabel siswa.
+    // Mapping jurusan_id dihapus; gunakan field 'jurusan' langsung.
         if (isset($data['nama_jurusan']) && isset($data['sekolah_id'])) {
             $jurusan = Jurusan::where('nama_jurusan', $data['nama_jurusan'])
                 ->where('sekolah_id', $data['sekolah_id'])
@@ -193,7 +175,7 @@ class SekolahController extends Controller
                 $jurusan_id = $jurusan->id;
             }
         }
-        $data['jurusan_id'] = $jurusan_id;
+    // $data['jurusan_id'] dihapus - gunakan $data['jurusan'] bila tersedia.
         unset($data['nama_jurusan']);
 
         // Normalisasi kelas ke integer bila mungkin
@@ -308,15 +290,14 @@ class SekolahController extends Controller
                     $statusVerifikasi = 'belum';
                 }
 
-                // Cari jurusan_id berdasarkan nama_jurusan dan sekolah_id
-                $jurusan_id = null;
+                // Perubahan skema: tidak lagi menggunakan jurusan_id.
                 if (!is_null($map['namajurusan']) && isset($row[$map['namajurusan']])) {
                     $nama_jurusan = $row[$map['namajurusan']];
                     $jurusan = Jurusan::where('nama_jurusan', $nama_jurusan)
                         ->where('sekolah_id', $sekolah_id)
                         ->first();
                     if ($jurusan) {
-                        $jurusan_id = $jurusan->id;
+                        // tidak digunakan lagi
                     }
                 }
 
@@ -327,7 +308,7 @@ class SekolahController extends Controller
                     'nama_lengkap' => !is_null($map['namalengkap']) ? ($row[$map['namalengkap']] ?? null) : null,
                     'nisn' => !is_null($map['nisn']) ? ($row[$map['nisn']] ?? null) : null,
                     'kelas' => !is_null($map['kelas']) ? ($row[$map['kelas']] ?? null) : null,
-                    'jurusan_id' => $jurusan_id,
+                    // 'jurusan' => $request->input('jurusan'),
                     'tahun_ajaran' => !is_null($map['tahunajaran']) ? (isset($row[$map['tahunajaran']]) ? trim((string)$row[$map['tahunajaran']]) : null) : null,
                     // Handle kemungkinan tanggal Excel numeric -> konversi ke Y-m-d
                     'tanggal_lahir' => !is_null($map['tanggallahir']) ? (function($val){
@@ -365,7 +346,7 @@ class SekolahController extends Controller
                     'nama_lengkap' => 'required',
                     'nisn' => 'required|unique:siswa',
                     'kelas' => 'required',
-                    'jurusan_id' => 'required|exists:jurusan,id',
+                    'jurusan' => 'required|string|max:100',
                     'tahun_ajaran' => 'required|string',
                     'tanggal_lahir' => 'nullable|date',
                     'jenis_kelamin' => 'nullable',

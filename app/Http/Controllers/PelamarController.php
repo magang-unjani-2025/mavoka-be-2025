@@ -8,6 +8,7 @@ use App\Models\LowonganMagang;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use App\Models\PemagangAktif;
 
 class PelamarController extends Controller
 {
@@ -17,6 +18,8 @@ class PelamarController extends Controller
         $validator = Validator::make($request->all(), [
             'siswa_id' => 'required|exists:siswa,id',
             'lowongan_id' => 'required|exists:lowongan_magang,id',
+            // Optional: jika lowongan terkait batch tertentu
+            'batch_id' => 'sometimes|exists:batch,id',
             'cv' => 'required|file|mimetypes:application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document|max:2048',
             'transkrip' => 'required|file|mimetypes:application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document|max:2048',
         ], [
@@ -50,6 +53,27 @@ class PelamarController extends Controller
                     'status' => 'error',
                     'message' => 'Lowongan tidak ditemukan.'
                 ], 404);
+            }
+
+            // Jika lowongan dikaitkan dengan batch tertentu via batch_id request, cek status batch
+            if ($request->filled('batch_id')) {
+                $batch = \App\Models\Batch::find($request->batch_id);
+                if (!$batch) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'Batch tidak ditemukan.'
+                    ], 404);
+                }
+                // Normalisasi status otomatis jika tanggal sudah lewat
+                if (method_exists($batch, 'autoCompleteIfPast')) {
+                    $batch->autoCompleteIfPast();
+                }
+                if (is_string($batch->status) && strtolower($batch->status) === 'selesai') {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'Pendaftaran ditutup karena batch sudah selesai.'
+                    ], 409);
+                }
             }
             if ($lowongan->kuota <= 0) {
                 return response()->json([
@@ -206,6 +230,26 @@ class PelamarController extends Controller
                     $lowongan->status = 'tidak';
                 }
                 $lowongan->save();
+
+                // Buat atau dapatkan pemagang aktif untuk pelamar ini
+                $exists = PemagangAktif::where('pelamar_id', $pelamar->id)->first();
+                if (!$exists) {
+                    PemagangAktif::create([
+                        'pelamar_id' => $pelamar->id,
+                        'perusahaan_id' => $lowongan->perusahaan_id,
+                        'lowongan_id' => $lowongan->id,
+                        // Sekolah id: diambil dari relasi siswa -> sekolah melalui pelamar
+                        'sekolah_id' => optional($pelamar->siswa)->sekolah_id ?? null,
+                        'tanggal_mulai' => now()->toDateString(),
+                        'status_magang' => 'aktif',
+                    ]);
+                } else {
+                    if (!$exists->tanggal_mulai) {
+                        $exists->tanggal_mulai = now()->toDateString();
+                    }
+                    $exists->status_magang = 'aktif';
+                    $exists->save();
+                }
             });
         } else {
             $pelamar->status_lamaran = $target;
@@ -248,6 +292,7 @@ class PelamarController extends Controller
         }
 
         if ($request->aksi === 'terima') {
+            // Pastikan belum ada lamaran lain yang diterima
             $alreadyAccepted = Pelamar::where('siswa_id', $pelamar->siswa_id)
                 ->where('status_lamaran', 'diterima')
                 ->where('id','!=',$pelamar->id)
@@ -258,11 +303,10 @@ class PelamarController extends Controller
                     'message' => 'Siswa sudah diterima pada lamaran lain.'
                 ], 409);
             }
-            $pelamar->status_lamaran = 'diterima';
-        } else {
-            // Terima: transaksi untuk kurangi kuota
+
             try {
                 DB::transaction(function() use ($pelamar) {
+                    // Lock lowongan dan kurangi kuota
                     $lowongan = LowonganMagang::where('id', $pelamar->lowongan_id)->lockForUpdate()->first();
                     if (!$lowongan) {
                         throw new \RuntimeException('Lowongan tidak ditemukan');
@@ -270,13 +314,34 @@ class PelamarController extends Controller
                     if ($lowongan->kuota <= 0) {
                         throw new \RuntimeException('Kuota lowongan sudah habis');
                     }
+
                     $pelamar->status_lamaran = 'diterima';
                     $pelamar->save();
+
                     $lowongan->kuota = $lowongan->kuota - 1;
                     if ($lowongan->kuota <= 0) {
                         $lowongan->status = 'tidak';
                     }
                     $lowongan->save();
+
+                    // Buat atau aktifkan PemagangAktif untuk pelamar ini
+                    $exists = PemagangAktif::where('pelamar_id', $pelamar->id)->first();
+                    if (!$exists) {
+                        PemagangAktif::create([
+                            'pelamar_id' => $pelamar->id,
+                            'perusahaan_id' => $lowongan->perusahaan_id,
+                            'lowongan_id' => $lowongan->id,
+                            'sekolah_id' => optional($pelamar->siswa)->sekolah_id ?? null,
+                            'tanggal_mulai' => now()->toDateString(),
+                            'status_magang' => 'aktif',
+                        ]);
+                    } else {
+                        if (!$exists->tanggal_mulai) {
+                            $exists->tanggal_mulai = now()->toDateString();
+                        }
+                        $exists->status_magang = 'aktif';
+                        $exists->save();
+                    }
                 });
             } catch (\RuntimeException $e) {
                 return response()->json([
@@ -284,8 +349,11 @@ class PelamarController extends Controller
                     'message' => $e->getMessage()
                 ], 409);
             }
+        } else {
+            // Tolak penawaran
+            $pelamar->status_lamaran = 'ditolak';
+            $pelamar->save();
         }
-        $pelamar->save();
 
         return response()->json([
             'message' => 'Respon penawaran tersimpan',

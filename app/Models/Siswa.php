@@ -22,7 +22,7 @@ class Siswa extends Authenticatable implements JWTSubject
         'nama_lengkap',
         'nisn',
         'kelas',
-        'jurusan_id',
+        'jurusan',
         'tahun_ajaran',
         'tanggal_lahir',
         'jenis_kelamin',
@@ -39,10 +39,7 @@ class Siswa extends Authenticatable implements JWTSubject
         return $this->belongsTo(Sekolah::class);
     }
 
-    public function jurusan()
-    {
-        return $this->belongsTo(Jurusan::class);
-    }
+    // kolom jurusan sekarang bertipe string, relasi jurusan dihapus
 
     public function lamaran()
     {

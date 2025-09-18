@@ -81,7 +81,6 @@ class PelatihanController extends Controller
                 'deskripsi' => 'required|string',
                 'kategori' => 'nullable|string',
                 'capaian_pembelajaran' => 'nullable|string',
-                'detail' => 'nullable|string',
                 'history_batch' => 'nullable|array',
             ]);
 
@@ -123,7 +122,6 @@ class PelatihanController extends Controller
                 'deskripsi' => 'sometimes|string',
                 'kategori' => 'sometimes|nullable|string',
                 'capaian_pembelajaran' => 'sometimes|nullable|string',
-                'detail' => 'sometimes|nullable|string',
                 'history_batch' => 'sometimes|nullable|array',
             ]);
 
