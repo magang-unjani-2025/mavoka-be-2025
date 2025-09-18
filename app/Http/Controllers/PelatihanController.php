@@ -7,6 +7,10 @@ use App\Models\Pelatihan;
 use Tymon\JWTAuth\Facades\JWTAuth;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Throwable;
+use Maatwebsite\Excel\Facades\Excel;
+use App\Helpers\GenericImport;
+use Illuminate\Support\Facades\Validator;
+use Carbon\Carbon;
 
 class PelatihanController extends Controller
 {
@@ -155,6 +159,111 @@ class PelatihanController extends Controller
             return $this->success(null, 'Pelatihan berhasil dihapus');
         } catch (ModelNotFoundException $e) {
             return $this->error($e, 404, 'Pelatihan tidak ditemukan');
+        } catch (Throwable $e) {
+            return $this->error($e);
+        }
+    }
+
+    // 🔒 LPK: upload bulk via Excel/CSV
+    public function uploadBulk(Request $request)
+    {
+        try {
+            $lembaga = JWTAuth::parseToken()->authenticate();
+
+            $request->validate([
+                'file' => 'required|file|mimes:xlsx,xls,csv,txt'
+            ]);
+
+            $sheets = Excel::toArray(new GenericImport, $request->file('file'));
+            $rows = $sheets[0] ?? [];
+            if (empty($rows)) {
+                return $this->error(new \Exception('File kosong'), 422, 'File kosong atau tidak terbaca');
+            }
+
+            $headerIndex = null;
+            foreach ($rows as $i => $r) {
+                if (collect($r)->filter(fn($v) => trim((string)$v) !== '')->isNotEmpty()) { $headerIndex = $i; break; }
+            }
+            if ($headerIndex === null) {
+                return $this->error(new \Exception('Header tidak ditemukan'), 422, 'Header tidak ditemukan');
+            }
+
+            $headersRaw = $rows[$headerIndex];
+            $dataRows = array_slice($rows, $headerIndex + 1);
+
+            $normalize = function ($name) {
+                $name = trim((string)$name);
+                $name = preg_replace('/\xEF\xBB\xBF/', '', $name);
+                $name = strtolower($name);
+                $name = preg_replace('/[^a-z0-9]+/i', '_', $name);
+                return trim($name, '_');
+            };
+
+            $columnMap = [
+                'nama_pelatihan' => ['nama_pelatihan','nama','judul'],
+                'deskripsi' => ['deskripsi','deskripsi_pelatihan'],
+                'kategori' => ['kategori','kategori_pelatihan'],
+                'capaian_pembelajaran' => ['capaian_pembelajaran','capaian','outcome','learning_outcomes'],
+                'history_batch' => ['history_batch','riwayat_batch'],
+            ];
+
+            $resolved = [];
+            foreach ($headersRaw as $idx => $h) {
+                $hNorm = $normalize($h);
+                foreach ($columnMap as $field => $aliases) {
+                    if (in_array($hNorm, array_map($normalize, $aliases), true)) {
+                        $resolved[$idx] = $field; break;
+                    }
+                }
+                if (!isset($resolved[$idx]) && isset($columnMap[$hNorm])) { $resolved[$idx] = $hNorm; }
+            }
+
+            $created = 0; $failed = 0; $errors = []; $inserted = [];
+
+            foreach ($dataRows as $rowIndex => $row) {
+                if (collect($row)->filter(fn($v) => trim((string)$v) !== '')->isEmpty()) continue;
+
+                $payload = [];
+                foreach ($row as $i => $val) {
+                    if (isset($resolved[$i])) { $payload[$resolved[$i]] = is_string($val) ? trim($val) : $val; }
+                }
+
+                // history_batch bisa dikirim sebagai JSON atau string dipisah koma
+                if (!empty($payload['history_batch'])) {
+                    if (is_string($payload['history_batch'])) {
+                        $json = json_decode($payload['history_batch'], true);
+                        $payload['history_batch'] = json_last_error() === JSON_ERROR_NONE ? $json : array_map('trim', explode(',', $payload['history_batch']));
+                    }
+                }
+
+                $validator = Validator::make($payload, [
+                    'nama_pelatihan' => 'required|string',
+                    'deskripsi' => 'required|string',
+                    'kategori' => 'nullable|string',
+                    'capaian_pembelajaran' => 'nullable|string',
+                    'history_batch' => 'nullable|array',
+                ]);
+
+                if ($validator->fails()) {
+                    $failed++;
+                    $errors[] = [
+                        'row' => $headerIndex + 2 + $rowIndex,
+                        'messages' => $validator->errors()->all(),
+                    ];
+                    continue;
+                }
+
+                $data = array_merge($validator->validated(), [ 'lembaga_id' => $lembaga->id ]);
+                $pelatihan = Pelatihan::create($data);
+                $inserted[] = $pelatihan->id; $created++;
+            }
+
+            return $this->success([
+                'created' => $created,
+                'failed' => $failed,
+                'errors' => $errors,
+                'inserted_ids' => $inserted,
+            ], 'Proses upload selesai');
         } catch (Throwable $e) {
             return $this->error($e);
         }

@@ -97,6 +97,7 @@ Route::get('/lpk/detail/{id}', [LembagaPelatihanController::class, 'detail']);
 Route::prefix('lowongan')->middleware(['auth:perusahaan'])->group(function () {
     Route::get('/lowongan-perusahaan', [LowonganMagangController::class, 'index']);
     Route::post('/create-lowongan', [LowonganMagangController::class, 'store']);
+    Route::post('/upload-bulk', [LowonganMagangController::class, 'uploadBulk']);
     Route::post('/update-lowongan/{id}', [LowonganMagangController::class, 'update']);
     Route::delete('/delete-lowongan/{id}', [LowonganMagangController::class, 'destroy']);
 });
@@ -124,6 +125,7 @@ Route::prefix('pelatihan')->group(function () {
 Route::prefix('pelatihan')->middleware(['auth:lpk'])->group(function () {
     Route::get('/mine', [PelatihanController::class, 'index']);
     Route::post('/create', [PelatihanController::class, 'store']);
+    Route::post('/upload-bulk', [PelatihanController::class, 'uploadBulk']);
     Route::put('/update/{id}', [PelatihanController::class, 'update']);
     Route::delete('/delete/{id}', [PelatihanController::class, 'destroy']);
     // Batch CRUD (LPK only)

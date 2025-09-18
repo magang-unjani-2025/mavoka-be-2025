@@ -136,6 +136,12 @@ class SekolahController extends Controller
     // Upload satu siswa
     public function uploadSiswaSingle(Request $request)
     {
+        // Ambil sekolah dari token (guard: sekolah)
+        $sekolah = auth('sekolah')->user();
+        if (!$sekolah) {
+            return response()->json(['message' => 'Unauthorized: token sekolah tidak valid atau tidak ada'], 401);
+        }
+
         $validator = Validator::make($request->all(), [
             'username' => 'nullable|unique:siswa',
             'email' => 'required|email|unique:siswa',
@@ -149,7 +155,6 @@ class SekolahController extends Controller
             'jenis_kelamin' => 'nullable',
             'alamat' => 'nullable',
             'kontak' => 'nullable',
-            'sekolah_id' => 'required|exists:sekolah,id',
             'status_verifikasi' => 'nullable|in:sudah,belum',
             'tanggal_verifikasi' => 'nullable|date',
         ]);
@@ -165,18 +170,19 @@ class SekolahController extends Controller
             $data['password'] = null;
         }
 
-    // Perubahan skema: kolom jurusan sekarang string pada tabel siswa.
-    // Mapping jurusan_id dihapus; gunakan field 'jurusan' langsung.
-        if (isset($data['nama_jurusan']) && isset($data['sekolah_id'])) {
-            $jurusan = Jurusan::where('nama_jurusan', $data['nama_jurusan'])
-                ->where('sekolah_id', $data['sekolah_id'])
-                ->first();
-            if ($jurusan) {
-                $jurusan_id = $jurusan->id;
-            }
+        // Perubahan skema: kolom jurusan sekarang string pada tabel siswa.
+        // Mapping jurusan_id dihapus; gunakan field 'jurusan' langsung.
+        // Simpan nama jurusan ke kolom string; terima nama_jurusan atau jurusan
+        if (isset($data['nama_jurusan']) && trim((string)$data['nama_jurusan']) !== '') {
+            $data['jurusan'] = trim((string)$data['nama_jurusan']);
+        } elseif (isset($data['jurusan'])) {
+            $data['jurusan'] = trim((string)$data['jurusan']);
         }
-    // $data['jurusan_id'] dihapus - gunakan $data['jurusan'] bila tersedia.
+        // $data['jurusan_id'] dihapus - gunakan $data['jurusan'] bila tersedia.
         unset($data['nama_jurusan']);
+
+        // Set sekolah_id dari token
+        $data['sekolah_id'] = $sekolah->id;
 
         // Normalisasi kelas ke integer bila mungkin
         if (isset($data['kelas']) && $data['kelas'] !== null && $data['kelas'] !== '') {
@@ -200,9 +206,14 @@ class SekolahController extends Controller
     // Upload banyak siswa via file Excel/CSV
     public function uploadSiswaBulk(Request $request)
     {
+        // Ambil sekolah dari token (guard: sekolah)
+        $sekolah = auth('sekolah')->user();
+        if (!$sekolah) {
+            return response()->json(['message' => 'Unauthorized: token sekolah tidak valid atau tidak ada'], 401);
+        }
+
         $validator = Validator::make($request->all(), [
             'file' => 'required|file|mimes:xlsx,csv',
-            'sekolah_id' => 'required|exists:sekolah,id',
         ]);
 
         if ($validator->fails()) {
@@ -210,7 +221,7 @@ class SekolahController extends Controller
         }
 
         $file = $request->file('file');
-        $sekolah_id = $request->input('sekolah_id');
+        $sekolah_id = $sekolah->id;
         $imported = [];
         $failed = [];
 
@@ -290,16 +301,7 @@ class SekolahController extends Controller
                     $statusVerifikasi = 'belum';
                 }
 
-                // Perubahan skema: tidak lagi menggunakan jurusan_id.
-                if (!is_null($map['namajurusan']) && isset($row[$map['namajurusan']])) {
-                    $nama_jurusan = $row[$map['namajurusan']];
-                    $jurusan = Jurusan::where('nama_jurusan', $nama_jurusan)
-                        ->where('sekolah_id', $sekolah_id)
-                        ->first();
-                    if ($jurusan) {
-                        // tidak digunakan lagi
-                    }
-                }
+                // Perubahan skema: tidak lagi menggunakan jurusan_id. Jurusan disimpan sebagai string.
 
                 $data = [
                     'username' => !is_null($map['username']) ? ($row[$map['username']] ?? null) : null,
@@ -308,7 +310,8 @@ class SekolahController extends Controller
                     'nama_lengkap' => !is_null($map['namalengkap']) ? ($row[$map['namalengkap']] ?? null) : null,
                     'nisn' => !is_null($map['nisn']) ? ($row[$map['nisn']] ?? null) : null,
                     'kelas' => !is_null($map['kelas']) ? ($row[$map['kelas']] ?? null) : null,
-                    // 'jurusan' => $request->input('jurusan'),
+                    // jurusan sebagai string langsung dari file
+                    'jurusan' => !is_null($map['namajurusan']) ? (isset($row[$map['namajurusan']]) ? trim((string)$row[$map['namajurusan']]) : null) : null,
                     'tahun_ajaran' => !is_null($map['tahunajaran']) ? (isset($row[$map['tahunajaran']]) ? trim((string)$row[$map['tahunajaran']]) : null) : null,
                     // Handle kemungkinan tanggal Excel numeric -> konversi ke Y-m-d
                     'tanggal_lahir' => !is_null($map['tanggallahir']) ? (function($val){
@@ -352,7 +355,6 @@ class SekolahController extends Controller
                     'jenis_kelamin' => 'nullable',
                     'alamat' => 'nullable',
                     'kontak' => 'nullable',
-                    'sekolah_id' => 'required|exists:sekolah,id',
                     'status_verifikasi' => 'nullable|in:sudah,belum',
                     'tanggal_verifikasi' => 'nullable|date',
                 ]);

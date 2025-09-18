@@ -373,6 +373,14 @@ class AuthController extends Controller
             'nama_lembaga' => 'required',
             'bidang_pelatihan' => 'required',
             'web_lembaga' => 'required',
+            // Optional fields that user can fill in
+            'deskripsi_lembaga' => 'sometimes|string|nullable',
+            'alamat' => 'sometimes|string|nullable',
+            'kontak' => 'sometimes|string|nullable',
+            'status_akreditasi' => 'sometimes|string|nullable',
+            // File uploads
+            'logo_lembaga' => 'sometimes|file|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'dokumen_akreditasi' => 'sometimes|file|mimes:pdf,jpeg,png,jpg,gif|max:5120',
         ]);
 
         if ($validator->fails()) {
@@ -381,6 +389,16 @@ class AuthController extends Controller
 
         $otp = random_int(100000, 999999);
 
+        // Handle file uploads if provided
+        $logoPath = null;
+        if ($request->hasFile('logo_lembaga')) {
+            $logoPath = $request->file('logo_lembaga')->store('lpk/logo', 'public');
+        }
+        $dokumenAkreditasiPath = null;
+        if ($request->hasFile('dokumen_akreditasi')) {
+            $dokumenAkreditasiPath = $request->file('dokumen_akreditasi')->store('lpk/dokumen', 'public');
+        }
+
         $lembaga = LembagaPelatihan::create([
             'username' => $request->username,
             'email' => $request->email,
@@ -388,9 +406,12 @@ class AuthController extends Controller
             'nama_lembaga' => $request->nama_lembaga,
             'bidang_pelatihan' => $request->bidang_pelatihan,
             'deskripsi_lembaga' => $request->deskripsi_lembaga,
+            'web_lembaga' => $request->web_lembaga,
             'alamat' => $request->alamat,
             'kontak' => $request->kontak,
             'status_akreditasi' => $request->status_akreditasi,
+            'logo_lembaga' => $logoPath,
+            'dokumen_akreditasi' => $dokumenAkreditasiPath,
             'status_verifikasi' => 'belum',
             'tanggal_verifikasi' => now(),
             'otp' => $otp,
@@ -412,6 +433,8 @@ class AuthController extends Controller
             'message' => 'Registrasi lembaga pelatihan berhasil. Cek email untuk OTP.',
             'data' => $lembaga,
             'email_status' => $emailStatus,
+            'logo_url' => $lembaga->logo_lembaga ? asset('storage/' . $lembaga->logo_lembaga) : null,
+            'dokumen_akreditasi_url' => $lembaga->dokumen_akreditasi ? asset('storage/' . $lembaga->dokumen_akreditasi) : null,
         ]);
     }
 
