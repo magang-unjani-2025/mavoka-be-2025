@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Storage;
 use Tymon\JWTAuth\Facades\JWTAuth;
+use Illuminate\Support\Facades\Auth;
 
 class LaporanMagangController extends Controller
 {
@@ -16,8 +17,7 @@ class LaporanMagangController extends Controller
     public function createLaporanHarian(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            // perusahaan_id tidak perlu dikirim, diambil dari data PemagangAktif
-            'magang_id' => 'required|integer|exists:pemagang_aktif,magang_id',
+            // perusahaan_id & magang_id tidak perlu dikirim, diambil dari PemagangAktif siswa yang login
             'tanggal_laporan' => 'required|date',
             'dokumentasi_foto' => 'sometimes|file|image|mimes:jpeg,png,jpg|max:4096',
             'deskripsi' => 'nullable|string',
@@ -31,13 +31,15 @@ class LaporanMagangController extends Controller
 
         $siswa = JWTAuth::parseToken()->authenticate();
 
-        // Pastikan magang_id milik siswa yang login dan statusnya aktif
-        $pemagang = PemagangAktif::with('pelamar')->find($request->magang_id);
-        if (!$pemagang || !$pemagang->pelamar || $pemagang->pelamar->siswa_id !== $siswa->id) {
-            return response()->json(['message' => 'Magang ini tidak valid untuk akun anda'], 403);
-        }
-        if (isset($pemagang->status_magang) && $pemagang->status_magang !== 'aktif') {
-            return response()->json(['message' => 'Status magang tidak aktif'], 422);
+        // Cari pemagang aktif berdasarkan siswa dari token
+        $pemagang = PemagangAktif::with('pelamar')
+            ->whereHas('pelamar', function ($q) use ($siswa) {
+                $q->where('siswa_id', $siswa->id);
+            })
+            ->where('status_magang', 'aktif')
+            ->first();
+        if (!$pemagang) {
+            return response()->json(['message' => 'Anda tidak terdaftar sebagai pemagang aktif'], 403);
         }
 
         $fotoPath = null;
@@ -47,7 +49,7 @@ class LaporanMagangController extends Controller
 
         // Cegah duplikat laporan pada tanggal yang sama untuk siswa & magang yang sama
         $exists = LaporanHarian::where('siswa_id', $siswa->id)
-            ->where('magang_id', $request->magang_id)
+            ->where('magang_id', $pemagang->magang_id)
             ->whereDate('tanggal_laporan', $request->tanggal_laporan)
             ->exists();
         if ($exists) {
@@ -58,7 +60,7 @@ class LaporanMagangController extends Controller
             // Ambil perusahaan dari data PemagangAktif
             'perusahaan_id' => $pemagang->perusahaan_id,
             'siswa_id' => $siswa->id,
-            'magang_id' => $request->magang_id,
+            'magang_id' => $pemagang->magang_id,
             'tanggal_laporan' => $request->tanggal_laporan,
             'dokumentasi_foto' => $fotoPath,
             'deskripsi' => $request->deskripsi,
@@ -96,12 +98,10 @@ class LaporanMagangController extends Controller
     }
 
     // Perusahaan: input penilaian mingguan
-    public function createEvaluasiMingguan(Request $request)
+    public function createEvaluasiMingguan(Request $request, $magangId)
     {
         $validator = Validator::make($request->all(), [
-            'perusahaan_id' => 'required|exists:perusahaan,id',
-            'siswa_id' => 'required|exists:siswa,id',
-            'magang_id' => 'required|integer',
+            // perusahaan_id, siswa_id, magang_id tidak perlu dikirim
             'aspek_teknis' => 'nullable|string',
             'aspek_komunikasi' => 'nullable|string',
             'aspek_kerjasama' => 'nullable|string',
@@ -117,6 +117,25 @@ class LaporanMagangController extends Controller
             return response()->json($validator->errors(), 422);
         }
 
+        // Ambil perusahaan dari token dan validasi kepemilikan terhadap magangId
+        $perusahaan = Auth::guard('perusahaan')->user();
+        if (!$perusahaan) {
+            return response()->json(['message' => 'Unauthorized perusahaan'], 401);
+        }
+
+        $pemagang = PemagangAktif::with(['pelamar'])
+            ->where('magang_id', $magangId)
+            ->first();
+        if (!$pemagang) {
+            return response()->json(['message' => 'Data magang tidak ditemukan'], 404);
+        }
+        if ($pemagang->perusahaan_id != $perusahaan->id) {
+            return response()->json(['message' => 'Anda tidak berhak menilai magang ini'], 403);
+        }
+        if (isset($pemagang->status_magang) && $pemagang->status_magang !== 'aktif') {
+            return response()->json(['message' => 'Status magang tidak aktif'], 422);
+        }
+
         $nilai = collect([
             $request->nilai_aspek_teknis,
             $request->nilai_aspek_komunikasi,
@@ -127,9 +146,10 @@ class LaporanMagangController extends Controller
         $rata = $nilai->isNotEmpty() ? round($nilai->avg(), 2) : null;
 
         $evaluasi = EvaluasiMagangMingguan::create([
-            'perusahaan_id' => $request->perusahaan_id,
-            'siswa_id' => $request->siswa_id,
-            'magang_id' => $request->magang_id,
+            'perusahaan_id' => $pemagang->perusahaan_id,
+            // siswa_id diambil dari relasi pelamar
+            'siswa_id' => optional($pemagang->pelamar)->siswa_id,
+            'magang_id' => $pemagang->magang_id,
             'aspek_teknis' => $request->aspek_teknis,
             'aspek_komunikasi' => $request->aspek_komunikasi,
             'aspek_kerjasama' => $request->aspek_kerjasama,
@@ -166,5 +186,87 @@ class LaporanMagangController extends Controller
             ->orderByDesc('upload_at')
             ->get();
         return response()->json(['data' => $items]);
+    }
+
+    // Sekolah: lihat evaluasi perusahaan & laporan harian untuk semua siswa sekolah
+    public function sekolahEvaluasiMagang(Request $request, $siswaId)
+    {
+        // Ambil sekolah dari guard 'sekolah' (middleware sudah memastikan token valid)
+        $sekolah = Auth::guard('sekolah')->user();
+        if (!$sekolah) {
+            return response()->json(['message' => 'Unauthorized sekolah'], 401);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'perusahaan_id' => 'sometimes|integer|exists:perusahaan,id',
+            'from' => 'sometimes|date',
+            'to' => 'sometimes|date|after_or_equal:from',
+            'with_laporan_harian' => 'sometimes|boolean',
+            'with_evaluasi_mingguan' => 'sometimes|boolean',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        // Pastikan siswa ini milik sekolah yg login
+        $targetSiswa = \App\Models\Siswa::where('id', $siswaId)->where('sekolah_id', $sekolah->id)->first();
+        if (!$targetSiswa) {
+            return response()->json(['message' => 'Siswa tidak ditemukan di sekolah ini'], 404);
+        }
+
+        $withDaily = $request->boolean('with_laporan_harian', true);
+        $withWeekly = $request->boolean('with_evaluasi_mingguan', true);
+
+        // Query base: siswa dalam sekolah ini
+        $siswaFilter = function($q) use ($sekolah, $siswaId) {
+            $q->where('sekolah_id', $sekolah->id)->where('id', $siswaId);
+        };
+
+        $daily = [];
+        if ($withDaily) {
+            // Cukup filter langsung berdasarkan siswa_id karena sudah diverifikasi milik sekolah ini
+            $dailyQuery = LaporanHarian::query()
+                ->where('siswa_id', $siswaId);
+            if ($request->filled('perusahaan_id')) {
+                $dailyQuery->where('perusahaan_id', $request->perusahaan_id);
+            }
+            if ($request->filled('from')) {
+                $dailyQuery->whereDate('tanggal_laporan', '>=', $request->from);
+            }
+            if ($request->filled('to')) {
+                $dailyQuery->whereDate('tanggal_laporan', '<=', $request->to);
+            }
+            $daily = $dailyQuery->orderByDesc('tanggal_laporan')->get();
+        }
+
+        $weekly = [];
+        if ($withWeekly) {
+            $weeklyQuery = EvaluasiMagangMingguan::query()
+                ->where('siswa_id', $siswaId);
+            if ($request->filled('perusahaan_id')) {
+                $weeklyQuery->where('perusahaan_id', $request->perusahaan_id);
+            }
+            if ($request->filled('from')) {
+                $weeklyQuery->whereDate('upload_at', '>=', $request->from);
+            }
+            if ($request->filled('to')) {
+                $weeklyQuery->whereDate('upload_at', '<=', $request->to);
+            }
+            $weekly = $weeklyQuery->orderByDesc('upload_at')->get();
+        }
+
+        return response()->json([
+            'sekolah_id' => $sekolah->id,
+            'siswa_id' => (int)$siswaId,
+            'filters' => [
+                'perusahaan_id' => $request->perusahaan_id,
+                'from' => $request->from,
+                'to' => $request->to,
+                'with_laporan_harian' => $withDaily,
+                'with_evaluasi_mingguan' => $withWeekly,
+            ],
+            'laporan_harian' => $daily,
+            'evaluasi_mingguan' => $weekly,
+        ]);
     }
 }
