@@ -51,6 +51,8 @@ class BatchController extends Controller
     {
         try {
             $batches = Batch::where('pelatihan_id', $pelatihanId)->orderByDesc('mulai')->get();
+            // Auto mark finished if past end date (non-destructive, updates only when needed)
+            $batches->each(fn($b) => method_exists($b, 'autoCompleteIfPast') ? $b->autoCompleteIfPast() : null);
             return $this->success($batches);
         } catch (Throwable $e) {
             return $this->error($e);
@@ -62,6 +64,9 @@ class BatchController extends Controller
     {
         try {
             $batch = Batch::with('pelatihan.lembaga')->findOrFail($id);
+            if (method_exists($batch, 'autoCompleteIfPast')) {
+                $batch->autoCompleteIfPast();
+            }
             return $this->success($batch);
         } catch (ModelNotFoundException $e) {
             return $this->error($e, 404, 'Batch tidak ditemukan');
@@ -77,6 +82,7 @@ class BatchController extends Controller
             $lembaga = JWTAuth::parseToken()->authenticate();
             $pelatihan = Pelatihan::where('lembaga_id', $lembaga->id)->findOrFail($pelatihanId);
             $batches = $pelatihan->batches()->orderByDesc('mulai')->get();
+            $batches->each(fn($b) => method_exists($b, 'autoCompleteIfPast') ? $b->autoCompleteIfPast() : null);
             return $this->success($batches);
         } catch (ModelNotFoundException $e) {
             return $this->error($e, 404, 'Pelatihan tidak ditemukan atau bukan milik Anda');
@@ -104,6 +110,10 @@ class BatchController extends Controller
             ]);
 
             $batch = Batch::create($data);
+            // Jika tanggal selesai sudah lewat, set status otomatis selesai
+            if (method_exists($batch, 'autoCompleteIfPast')) {
+                $batch->autoCompleteIfPast();
+            }
             return $this->success($batch, 'Batch berhasil dibuat', 201);
         } catch (ModelNotFoundException $e) {
             return $this->error($e, 404, 'Pelatihan tidak ditemukan atau bukan milik Anda');
@@ -136,6 +146,10 @@ class BatchController extends Controller
             }
 
             $batch->update($data);
+            // Jika tanggal selesai sudah lewat, set status otomatis selesai
+            if (method_exists($batch, 'autoCompleteIfPast')) {
+                $batch->autoCompleteIfPast();
+            }
             return $this->success($batch, 'Batch berhasil diperbarui');
         } catch (ModelNotFoundException $e) {
             return $this->error($e, 404, 'Batch/Pelatihan tidak ditemukan atau bukan milik Anda');

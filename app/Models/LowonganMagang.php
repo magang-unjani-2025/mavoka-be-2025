@@ -20,6 +20,7 @@ class LowonganMagang extends Model
         'lokasi_penempatan',
         'persyaratan',
         'benefit',
+        'tugas_tanggung_jawab',
         'status',
         'deadline_lamaran',
         'periode_awal',

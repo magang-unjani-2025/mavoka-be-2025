@@ -14,7 +14,8 @@ return [
     |
     */
 
-    'default' => env('MAIL_MAILER', 'log'),
+    // Use failover by default so if SMTP fails, mail is logged
+    'default' => env('MAIL_MAILER', 'failover'),
 
     /*
     |--------------------------------------------------------------------------
@@ -39,8 +40,8 @@ return [
 
         'smtp' => [
             'transport' => 'smtp',
-            'scheme' => env('MAIL_SCHEME'),
-            'url' => env('MAIL_URL'),
+            // Laravel expects encryption via "encryption" not "scheme"; valid values: null, tls, ssl
+            'encryption' => env('MAIL_ENCRYPTION'),
             'host' => env('MAIL_HOST', '127.0.0.1'),
             'port' => env('MAIL_PORT', 2525),
             'username' => env('MAIL_USERNAME'),

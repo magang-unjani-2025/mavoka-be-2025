@@ -17,7 +17,6 @@ class Pelatihan extends Model
         'deskripsi',
         'kategori',
         'capaian_pembelajaran',
-        'detail',
         'history_batch',
     ];
 

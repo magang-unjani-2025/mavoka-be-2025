@@ -15,6 +15,7 @@ use App\Http\Controllers\PerusahaanController;
 use App\Http\Controllers\PelatihanController;
 use App\Http\Controllers\BatchController;
 use App\Http\Controllers\LembagaPelatihanController;
+use App\Http\Controllers\LaporanMagangController;
 
 // =================== ROUTE USER (AUTH, REGISTER, ACCOUNT MGMT) ====================
 Route::prefix('user')->group(function () {
@@ -96,6 +97,7 @@ Route::get('/lpk/detail/{id}', [LembagaPelatihanController::class, 'detail']);
 Route::prefix('lowongan')->middleware(['auth:perusahaan'])->group(function () {
     Route::get('/lowongan-perusahaan', [LowonganMagangController::class, 'index']);
     Route::post('/create-lowongan', [LowonganMagangController::class, 'store']);
+    Route::post('/upload-bulk', [LowonganMagangController::class, 'uploadBulk']);
     Route::post('/update-lowongan/{id}', [LowonganMagangController::class, 'update']);
     Route::delete('/delete-lowongan/{id}', [LowonganMagangController::class, 'destroy']);
 });
@@ -105,9 +107,9 @@ Route::middleware('auth:perusahaan')->get('/perusahaan/pelamar', [PerusahaanCont
 
 // ==================== ROUTE PELAMAR (LAMARAN) ====================
 Route::prefix('pelamar')->group(function () {
-    Route::post('/', [PelamarController::class, 'store']);
-    Route::put('/{id}/status', [PelamarController::class, 'updateStatus']);
-    Route::post('/{id}/respond-penawaran', [PelamarController::class, 'respondPenawaran']);
+    Route::middleware('auth:siswa')->post('/', [PelamarController::class, 'store']);
+    Route::middleware('auth:perusahaan,admin')->put('/{id}/status', [PelamarController::class, 'updateStatus']);
+    Route::middleware('auth:siswa')->post('/{id}/respond-penawaran', [PelamarController::class, 'respondPenawaran']);
 });
 
 // =================== ROUTE PELATIHAN (PUBLIC) ====================
@@ -123,6 +125,7 @@ Route::prefix('pelatihan')->group(function () {
 Route::prefix('pelatihan')->middleware(['auth:lpk'])->group(function () {
     Route::get('/mine', [PelatihanController::class, 'index']);
     Route::post('/create', [PelatihanController::class, 'store']);
+    Route::post('/upload-bulk', [PelatihanController::class, 'uploadBulk']);
     Route::put('/update/{id}', [PelatihanController::class, 'update']);
     Route::delete('/delete/{id}', [PelatihanController::class, 'destroy']);
     // Batch CRUD (LPK only)
@@ -130,4 +133,19 @@ Route::prefix('pelatihan')->middleware(['auth:lpk'])->group(function () {
     Route::post('/{pelatihanId}/batch', [BatchController::class, 'store']);
     Route::post('/{pelatihanId}/batch/{id}', [BatchController::class, 'update']);
     Route::delete('/{pelatihanId}/batch/{id}', [BatchController::class, 'destroy']);
+});
+
+// =================== ROUTE MAGANG: LAPORAN & EVALUASI ====================
+Route::prefix('magang')->group(function () {
+    // Siswa membuat laporan harian (require auth siswa)
+    Route::middleware('auth:siswa')->post('/laporan-harian', [LaporanMagangController::class, 'createLaporanHarian']);
+    // Perusahaan mengevaluasi laporan harian (require auth perusahaan)
+    Route::middleware('auth:perusahaan')->post('/laporan-harian/{id}/evaluasi', [LaporanMagangController::class, 'evaluasiLaporanHarian']);
+    // Perusahaan input penilaian mingguan (require auth perusahaan)
+    Route::middleware('auth:perusahaan')->post('/evaluasi-mingguan/{magangId}', [LaporanMagangController::class, 'createEvaluasiMingguan']);
+    // Listing
+    Route::get('/laporan-harian/siswa/{siswaId}', [LaporanMagangController::class, 'listLaporanSiswa']);
+    Route::get('/evaluasi-mingguan/siswa/{siswaId}', [LaporanMagangController::class, 'listEvaluasiSiswa']);
+    // Sekolah view evaluations & daily reports for its students
+    Route::middleware('auth:sekolah')->get('/sekolah/{siswaId}/evaluasi', [LaporanMagangController::class, 'sekolahEvaluasiMagang']);
 });
