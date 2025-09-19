@@ -15,7 +15,7 @@ class SiswaSeeder extends Seeder
 {
     public function run(): void
     {
-        $path = base_path('public/data-dummy/data-siswa.xlsx');
+        $path = base_path('data-dummy/data-siswa.xlsx');
         if (!file_exists($path)) {
             $this->command?->warn("File Excel data-dummy/data-siswa.xlsx tidak ditemukan. Menyisipkan data fallback.");
             $this->seedFallback();

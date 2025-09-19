@@ -13,7 +13,7 @@ class SekolahSeeder extends Seeder
 {
     public function run(): void
     {
-        $path = base_path('public/data-dummy/data-sekolah.xlsx');
+        $path = base_path('data-dummy/data-sekolah.xlsx');
         if (!file_exists($path)) {
             $this->command?->warn('File data-dummy/data-sekolah.xlsx tidak ditemukan. Menyisipkan data default.');
             $this->seedFallback();

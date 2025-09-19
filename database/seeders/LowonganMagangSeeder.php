@@ -16,7 +16,7 @@ class LowonganMagangSeeder extends Seeder
 {
     public function run(): void
     {
-        $dir = base_path('public/data-dummy/lowongan-magang');
+        $dir = base_path('data-dummy/lowongan-magang');
         if (!is_dir($dir)) { $this->command?->warn('Folder '.$dir.' tidak ditemukan.'); return; }
         $files = glob($dir.'/*.{xlsx,xls,csv,txt}', GLOB_BRACE);
         if (empty($files)) { $this->command?->warn('Tidak ada file Excel/CSV lowongan.'); return; }

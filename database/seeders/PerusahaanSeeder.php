@@ -13,7 +13,7 @@ class PerusahaanSeeder extends Seeder
 {
     public function run(): void
     {
-        $path = base_path('public/data-dummy/data-perusahaan.xlsx');
+        $path = base_path('data-dummy/data-perusahaan.xlsx');
         if (!file_exists($path)) {
             $this->command?->warn('File data-dummy/data-perusahaan.xlsx tidak ditemukan. Menyisipkan fallback.');
             $this->seedFallback();

@@ -13,7 +13,7 @@ class LembagaSeeder extends Seeder
 {
     public function run(): void
     {
-        $path = base_path('public/data-dummy/lembaga-pelatihan.xlsx');
+        $path = base_path('data-dummy/lembaga-pelatihan.xlsx');
         if (!file_exists($path)) {
             $this->command?->warn('File data-dummy/lembaga-pelatihan.xlsx tidak ditemukan. Menyisipkan data default.');
             $this->seedFallback();
