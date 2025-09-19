@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
 use App\Helpers\ExcelSeederHelper;
+use App\Helpers\DataDummyHelper;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Helpers\GenericImport;
 
@@ -16,8 +17,8 @@ class LowonganMagangSeeder extends Seeder
 {
     public function run(): void
     {
-        $dir = base_path('data-dummy/lowongan-magang');
-        if (!is_dir($dir)) { $this->command?->warn('Folder '.$dir.' tidak ditemukan.'); return; }
+    $dir = DataDummyHelper::resolve('lowongan-magang', true);
+    if (!$dir) { $this->command?->warn('Folder lowongan-magang tidak ditemukan di data-dummy (public/base).'); return; }
         $files = glob($dir.'/*.{xlsx,xls,csv,txt}', GLOB_BRACE);
         if (empty($files)) { $this->command?->warn('Tidak ada file Excel/CSV lowongan.'); return; }
 

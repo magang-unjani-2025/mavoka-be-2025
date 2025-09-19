@@ -8,15 +8,16 @@ use App\Models\LembagaPelatihan;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use App\Helpers\ExcelSeederHelper;
+use App\Helpers\DataDummyHelper;
 
 class PelatihanSeeder extends Seeder
 {
     public function run(): void
     {
         // File berada di public/data-dummy agar konsisten dengan seeder lain
-        $path = public_path('data-dummy/pelatihan.xlsx');
-        if (!file_exists($path)) {
-            $this->command?->warn('File public/data-dummy/pelatihan.xlsx tidak ditemukan. Seeder Pelatihan dilewati.');
+        $path = DataDummyHelper::resolve('pelatihan.xlsx');
+        if (!$path) {
+            $this->command?->warn('File pelatihan.xlsx tidak ditemukan di folder data-dummy (public/base). Seeder Pelatihan dilewati.');
             return;
         }
         $this->command?->info('Import pelatihan dari: '.$path);

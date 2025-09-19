@@ -7,15 +7,16 @@ use App\Models\Sekolah;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use App\Helpers\ExcelSeederHelper;
+use App\Helpers\DataDummyHelper;
 use Illuminate\Support\Str;
 
 class SekolahSeeder extends Seeder
 {
     public function run(): void
     {
-        $path = base_path('data-dummy/data-sekolah.xlsx');
-        if (!file_exists($path)) {
-            $this->command?->warn('File data-dummy/data-sekolah.xlsx tidak ditemukan. Menyisipkan data default.');
+        $path = DataDummyHelper::resolve('data-sekolah.xlsx');
+        if (!$path) {
+            $this->command?->warn('File data-sekolah.xlsx tidak ditemukan di folder data-dummy (public/base). Menyisipkan data default.');
             $this->seedFallback();
             return;
         }

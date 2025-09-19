@@ -9,15 +9,16 @@ use App\Models\Siswa;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Hash;
 use App\Helpers\ExcelSeederHelper;
+use App\Helpers\DataDummyHelper;
 use Illuminate\Support\Str;
 
 class SiswaSeeder extends Seeder
 {
     public function run(): void
     {
-        $path = base_path('data-dummy/data-siswa.xlsx');
-        if (!file_exists($path)) {
-            $this->command?->warn("File Excel data-dummy/data-siswa.xlsx tidak ditemukan. Menyisipkan data fallback.");
+        $path = DataDummyHelper::resolve('data-siswa.xlsx');
+        if (!$path) {
+            $this->command?->warn("File data-siswa.xlsx tidak ditemukan di folder data-dummy (public/base). Menyisipkan data fallback.");
             $this->seedFallback();
             return;
         }
@@ -87,9 +88,13 @@ class SiswaSeeder extends Seeder
                 $payload['tahun_ajaran'] = (int)preg_replace('/[^0-9]/','', (string)$payload['tahun_ajaran']);
             }
             if (isset($payload['jenis_kelamin'])) {
-                $jk = strtolower($payload['jenis_kelamin']);
-                if (in_array($jk, ['l','laki','laki_laki','male','m'])) $payload['jenis_kelamin'] = 'L';
-                elseif (in_array($jk, ['p','perempuan','female','f'])) $payload['jenis_kelamin'] = 'P';
+                $jkRaw = trim((string)$payload['jenis_kelamin']);
+                $jk = strtolower(str_replace(['-',' '], '_', $jkRaw));
+                $mapL = ['l','laki','laki_laki','laki_laki_laki','lk','m','male','cowok','putra'];
+                $mapP = ['p','perempuan','pr','f','female','wanita','cewek','putri'];
+                if (in_array($jk, $mapL, true)) $payload['jenis_kelamin'] = 'L';
+                elseif (in_array($jk, $mapP, true)) $payload['jenis_kelamin'] = 'P';
+                else $payload['jenis_kelamin'] = null; // biarkan null agar tidak gagal validasi
             }
             if (isset($payload['tanggal_lahir'])) {
                 $payload['tanggal_lahir'] = ExcelSeederHelper::parseDateFlexible($payload['tanggal_lahir']);
