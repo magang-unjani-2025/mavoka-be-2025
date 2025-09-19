@@ -8,14 +8,15 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use App\Models\Perusahaan;
 use App\Helpers\ExcelSeederHelper;
+use App\Helpers\DataDummyHelper;
 
 class PerusahaanSeeder extends Seeder
 {
     public function run(): void
     {
-        $path = base_path('data-dummy/data-perusahaan.xlsx');
-        if (!file_exists($path)) {
-            $this->command?->warn('File data-dummy/data-perusahaan.xlsx tidak ditemukan. Menyisipkan fallback.');
+        $path = DataDummyHelper::resolve('data-perusahaan.xlsx');
+        if (!$path) {
+            $this->command?->warn('File data-perusahaan.xlsx tidak ditemukan di folder data-dummy (public/base). Menyisipkan fallback.');
             $this->seedFallback();
             return;
         }

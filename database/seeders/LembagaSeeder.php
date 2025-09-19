@@ -8,14 +8,15 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use App\Models\LembagaPelatihan;
 use App\Helpers\ExcelSeederHelper;
+use App\Helpers\DataDummyHelper;
 
 class LembagaSeeder extends Seeder
 {
     public function run(): void
     {
-        $path = base_path('data-dummy/lembaga-pelatihan.xlsx');
-        if (!file_exists($path)) {
-            $this->command?->warn('File data-dummy/lembaga-pelatihan.xlsx tidak ditemukan. Menyisipkan data default.');
+        $path = DataDummyHelper::resolve('lembaga-pelatihan.xlsx');
+        if (!$path) {
+            $this->command?->warn('File lembaga-pelatihan.xlsx tidak ditemukan di folder data-dummy (public/base). Menyisipkan data default.');
             $this->seedFallback();
             return;
         }
@@ -48,6 +49,18 @@ class LembagaSeeder extends Seeder
             foreach ($row as $i=>$val){ if(!isset($resolved[$i])) continue; $field=$resolved[$i]; $payload[$field]=is_string($val)?trim($val):$val; }
 
             if(empty($payload['nama_lembaga'])) { $skipped++; $errors[]=['row'=>$headerIndex+2+$rowIndex,'messages'=>['nama_lembaga kosong']]; continue; }
+
+            // Cast kontak ke string agar tidak gagal saat numeric / float excel
+            if (array_key_exists('kontak', $payload)) {
+                if (is_numeric($payload['kontak'])) {
+                    // Hilangkan .0 jika format float
+                    $payload['kontak'] = preg_replace('/\.0$/','', (string)$payload['kontak']);
+                } else {
+                    $payload['kontak'] = (string)$payload['kontak'];
+                }
+                $payload['kontak'] = trim($payload['kontak']);
+                if ($payload['kontak'] === '') $payload['kontak'] = null;
+            }
 
             $validator=Validator::make($payload,[
                 'nama_lembaga'=>'required|string',
