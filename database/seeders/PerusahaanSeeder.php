@@ -4,108 +4,73 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use App\Models\Perusahaan;
-use App\Helpers\ExcelSeederHelper;
-use App\Helpers\DataDummyHelper;
 
 class PerusahaanSeeder extends Seeder
 {
     public function run(): void
     {
-        $path = DataDummyHelper::resolve('data-perusahaan.xlsx');
-        if (!$path) {
-            $this->command?->warn('File data-perusahaan.xlsx tidak ditemukan di folder data-dummy (public/base). Menyisipkan fallback.');
-            $this->seedFallback();
-            return;
-        }
-        $this->command?->info('Import perusahaan dari: '.$path);
-        try { $rows = ExcelSeederHelper::loadFirstSheet($path); }
-        catch (\Throwable $e) { $this->command?->error('Gagal baca Excel: '.$e->getMessage()); return; }
-        if (empty($rows)) { $this->command?->warn('Sheet kosong.'); return; }
-
-        $headerIndex = ExcelSeederHelper::findHeaderIndex($rows);
-        if ($headerIndex === null) { $this->command?->error('Header tidak ditemukan.'); return; }
-        $rawHeaders = $rows[$headerIndex];
-        $dataRows = array_slice($rows, $headerIndex + 1);
-
-        $columnMap = [
-            'nama_perusahaan' => ['nama_perusahaan','perusahaan','nama','company_name'],
-            'bidang_usaha' => ['bidang_usaha','bidang','industri','industry'],
-            'deskripsi_usaha' => ['deskripsi_usaha','deskripsi','description'],
-            'web_perusahaan' => ['web_perusahaan','website','web'],
-            'alamat' => ['alamat','alamat_lengkap','address'],
-            'kontak' => ['kontak','no_hp','telepon','telp','hp','phone'],
-            'email' => ['email','surelem'],
-            'penanggung_jawab' => ['penanggung_jawab','pic','contact_person'],
+        // Data statis dari gambar: username,email,password(status plain -> di-hash), status_verifikasi, tanggal_verifikasi,
+        // nama_perusahaan, bidang_usaha, web_perusahaan, deskripsi_usaha, alamat, kontak, penanggung_jawab
+        $rows = [
+            ['techindo01','info@techindo.com','pass1234','Terverifikasi','2024-08-12','PT Tech Indo Solutions','Teknologi','www.oceshakins.com','Penyedia solusi IT untuk perusahaan menengah dan besar','Jakarta Selatan, DKI Jakarta','81234567890','Andi Pratama'],
+            ['sehcatare','contact@sehahub.id','sehat202','Terverifikasi','2024-09-01','SehatHub Indonesia','Kesehatan','www.oceshakins.com','Platform kesehatan digital & konsultasi dokter','Sleman, DIY','82197865432','Siti Rahmawati'],
+            ['edusmart','support@edusmart.co.id','eduSmart','Terverifikasi','2024-09-01','EduSmart Nusantara','Pendidikan','www.oceshakins.com','Startup e-learning interaktif','Yogyakarta, DIY','8122341234','Budi Santoso'],
+            ['foodez','hello@foodez.com','foodez@9','Terverifikasi','2024-07-20','Foodez Nusantara','Kuliner','www.oceshakins.com','Aplikasi delivery makanan khas Nusantara','Surabaya, Jawa Timur','83145678912','Lina Kartika'],
+            ['greenbuild','admin@greenbuild.id','green2023','Terverifikasi','2024-09-01','GreenBuild Indonesia','Konstruksi','www.oceshakins.com','Perusahaan konstruksi ramah lingkungan','Bandung, Jawa Barat','82917865432','Rizky Maulana'],
+            ['fashionly','cs@fashionly.co','style123','Terverifikasi','2024-09-01','Fashionly Co.','Fashion & Retail','www.oceshakins.com','Marketplace fashion modern & UMKM','Denpasar, Bali','82345678901','Ayu Lestari'],
+            ['agritechd','info@agritechind.com','agri2024','Terverifikasi','2024-08-30','AgriTech Indonesia','Pertanian','www.oceshakins.com','Solusi digital untuk petani Indonesia','Solo, Jawa Tengah','81456788934','Dedi Gunawan'],
+            ['traveloka02','contact@travelco.id','travel@2','Terverifikasi','2024-08-19','Travelo Nusantara','Pariwisata','www.oceshakins.com','Aplikasi pemesanan tiket & hotel','Medan, Sumatera Utara','8122345678','Irma Suryani'],
+            ['medisafe','admin@medisafe.id','medisafe','Terverifikasi','2024-09-01','MediSafe Indonesia','Farmasi','www.oceshakins.com','Distributor obat dan alat kesehatan','Makassar, Sulawesi Selatan','82197823456','Hasan Basri'],
+            ['kreatify','hello@kreatify.com','kreatif2','Terverifikasi','2024-09-01','Kreatify Digital Agency','Digital Marketing','www.oceshakins.com','Agensi kreatif untuk branding','Malang, Jawa Timur','81234567890','Nadia Putri'],
+            ['energindo','info@energindo.com','energi20','Terverifikasi','2024-08-25','Energi Indo Power','Energi','www.oceshakins.com','Penyedia energi terbarukan untuk industri','Balikpapan, Kalimantan Timur','82199988877','Joko Pranoto'],
+            ['finteksmart','admin@finteksmart.id','fintek@3','Terverifikasi','2024-09-01','Fintek Smart Solutions','Keuangan','www.oceshakins.com','Startup fintech untuk UMKM','Jakarta Pusat, DKI Jakarta','81345678945','Ratna Wulandari'],
+            ['rumahceria','cs@rumahceria.co.id','rumah123','Terverifikasi','2024-09-10','Rumah Ceria Property','Properti','www.oceshakins.com','Agen properti dan rumah hunian','Tangerang, Banten','81366777788','Yusuf Ibrahim'],
+            ['oceanblue','hello@oceanblue.com','ocean888','Terverifikasi','2024-09-05','Ocean Blue Logistics','Logistik','www.oceshakins.com','Jasa ekspedisi laut domestik','Batam, Kepulauan Riau','82145678901','Mega Andriani'],
+            ['artify','contact@artify.id','artify20','Terverifikasi','2024-08-27','Artify Indonesia','Seni & Kreatif','www.oceshakins.com','Platform seni digital untuk kreator lokal','Solo, Jawa Tengah','81922334455','Galih Saputra'],
+            ['mediatrn','support@mediatrn.co','media123','Terverifikasi','2024-08-30','Mediatron Media Group','Media & Hiburan','www.oceshakins.com','Produksi konten & media publik','Bandung, Jawa Barat','82134567890','Dian Anggraini'],
+            ['smarttrans','info@smarttrans.id','trans%202','Terverifikasi','2024-09-02','SmartTrans Indonesia','Transportasi','www.oceshakins.com','Layanan transportasi dan logistik','Samarinda, Kalimantan Timur','81399912345','Farhan Yusuf'],
+            ['gardenfresh','hello@gardenfresh.com','garden112','Terverifikasi','2024-09-01','Garden Fresh Foods','Agribisnis','www.oceshakins.com','Produksi dan distribusi sayuran segar','Bogor, Jawa Barat','82123498765','Marlina Dewi'],
+            ['luxehotel','admin@luxehotel.id','luxe2024','Terverifikasi','2024-08-28','Luxe Hotel Indonesia','Hospitality','www.oceshakins.com','Jaringan hotel premium di Indonesia','Bali, Denpasar','81255567891','Kevin Pradipta'],
+            ['gameverse','cs@gameverse.co','game2024','Terverifikasi','2024-08-30','GameVerse Nusantara','Game & Esports','www.oceshakins.com','Platform game online & turnamen','Bandung, Jawa Barat','81123456789','Arya Nugraha'],
+            ['ecofuture','info@ecofuture.id','eco20245','Terverifikasi','2024-09-06','EcoFuture Nusantara','Lingkungan','www.oceshakins.com','Startup pengolahan limbah modern','Depok, Jawa Barat','81266665544','Rani Prameswari'],
+            ['cyberguard','admin@cyberguard.co.id','cyber%99','Terverifikasi','2024-08-29','CyberGuard Indonesia','Keamanan IT','www.oceshakins.com','Penyedia jasa keamanan siber','Jakarta Utara, DKI Jakarta','82777778990','Aditya Surya'],
+            ['bamboolife','hello@bamboolife.com','bamboo20','Terverifikasi','2024-09-09','BambooLife Indonesia','Furniture & Dekor','www.oceshakins.com','Produk furniture bambu ramah lingkungan','Sleman, DIY','82333444555','Maya Handayani'],
+            ['stellartech','support@stellartech.id','st3llar!','Terverifikasi','2024-09-14','StellarTech Nusantara','Teknologi','www.oceshakins.com','Startup AI & big data untuk industri','Bandung, Jawa Barat','82199992233','Rangga Wirawan'],
         ];
-        $resolved = ExcelSeederHelper::mapHeaders($rawHeaders, $columnMap);
 
-        $created=0; $updated=0; $skipped=0; $errors=[]; $now=now();
-        foreach ($dataRows as $rowIndex => $row) {
-            if (collect($row)->filter(fn($v)=>trim((string)$v)!=='')->isEmpty()) continue;
-            $payload=[];
-            foreach ($row as $i=>$val) { if(!isset($resolved[$i])) continue; $field=$resolved[$i]; $payload[$field]=is_string($val)?trim($val):$val; }
+        $created=0; $updated=0; $now = now();
+        foreach ($rows as [$username,$email,$plainPassword,$status,$tglVerif,$namaPerusahaan,$bidang,$web,$deskripsi,$alamat,$kontak,$pic]) {
+            $data = [
+                'username' => $username,
+                'email' => $email,
+                'password' => Hash::make($plainPassword),
+                'status_verifikasi' => $status,
+                'tanggal_verifikasi' => $tglVerif ?: $now,
+                'nama_perusahaan' => $namaPerusahaan,
+                'bidang_usaha' => $bidang,
+                'web_perusahaan' => $web,
+                'deskripsi_usaha' => $deskripsi,
+                'alamat' => $alamat,
+                'kontak' => $kontak,
+                'penanggung_jawab' => $pic,
+                'otp' => Str::random(6),
+                'otp_expired_at' => $now->copy()->addMinutes(10),
+                'updated_at' => $now,
+            ];
 
-            if (empty($payload['nama_perusahaan'])) { $skipped++; $errors[]=['row'=>$headerIndex+2+$rowIndex,'messages'=>['nama_perusahaan kosong']]; continue; }
-            // Cast kontak always string
-            if(isset($payload['kontak'])) $payload['kontak'] = (string)$payload['kontak'];
-
-            $validator = Validator::make($payload,[
-                'nama_perusahaan'=>'required|string',
-                'bidang_usaha'=>'nullable|string',
-                'deskripsi_usaha'=>'nullable|string',
-                'web_perusahaan'=>'nullable|string',
-                'alamat'=>'nullable|string',
-                'kontak'=>'nullable|string',
-                'email'=>'nullable|email',
-                'penanggung_jawab'=>'nullable|string'
-            ]);
-            if($validator->fails()) { $skipped++; $errors[]=['row'=>$headerIndex+2+$rowIndex,'messages'=>$validator->errors()->all()]; continue; }
-            $data = $validator->validated();
-
-            // Username slug unik
-            $usernameBase = Str::slug(substr($data['nama_perusahaan'],0,25)) ?: 'company';
-            $candidate = $usernameBase; $suffix=1;
-            while (Perusahaan::where('username',$candidate)->exists()) { $candidate = $usernameBase.($suffix++); }
-            $data['username'] = $candidate;
-            $data['password'] = Hash::make('perusahaan123');
-            $data['status_verifikasi'] = 'Terverifikasi';
-            $data['tanggal_verifikasi'] = $now;
-            $data['otp'] = Str::random(6);
-            $data['otp_expired_at'] = $now->copy()->addMinutes(10);
-
-            $existing = null;
-            if (!empty($data['email'])) { $existing = Perusahaan::where('email',$data['email'])->first(); }
-            if (!$existing) { $existing = Perusahaan::where('nama_perusahaan',$data['nama_perusahaan'])->first(); }
-
-            if ($existing) { $existing->fill($data); $existing->updated_at=$now; $existing->save(); $updated++; }
-            else { $data['created_at']=$now; $data['updated_at']=$now; Perusahaan::create($data); $created++; }
+            $existing = Perusahaan::where('email',$email)->first();
+            if(!$existing) { $existing = Perusahaan::where('nama_perusahaan',$namaPerusahaan)->first(); }
+            if ($existing) {
+                $existing->fill($data)->save();
+                $updated++;
+            } else {
+                $data['created_at'] = $now;
+                Perusahaan::create($data);
+                $created++;
+            }
         }
-
-        $this->command?->info("Import perusahaan selesai: created=$created updated=$updated skipped=$skipped");
-        if($errors){ $this->command?->warn('Contoh error:'); foreach(array_slice($errors,0,5) as $e){ $this->command?->line('- Row '.$e['row'].': '.implode('; ',$e['messages'])); } }
-    }
-
-    private function seedFallback(): void
-    {
-        Perusahaan::updateOrCreate(
-            ['email' => 'info@techcorp.com'],
-            [
-                'username' => 'techcorp',
-                'password' => Hash::make('techcorp'),
-                'status_verifikasi' => 'Terverifikasi',
-                'tanggal_verifikasi' => now(),
-                'nama_perusahaan' => 'TechCorp Indonesia',
-                'bidang_usaha' => 'Teknologi Informasi',
-                'deskripsi_usaha' => 'Perusahaan IT yang fokus pada pengembangan perangkat lunak dan solusi cloud.',
-                'alamat' => 'Jl. Teknologi No.88, Jakarta',
-                'kontak' => '021-12345678',
-                'penanggung_jawab' => 'Dian Prasetyo',
-                'web_perusahaan' => 'https://pmb.unjaya.ac.id/',
-            ]
-        );
-        $this->command?->info('Fallback perusahaan seeded.');
+        $this->command?->info("Seed perusahaan statis selesai: created=$created updated=$updated");
     }
 }
