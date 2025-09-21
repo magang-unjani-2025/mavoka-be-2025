@@ -17,7 +17,7 @@ return new class extends Migration
             $table->string('email')->nullable()->unique();
             $table->string('password')->nullable();
             $table->string('status_verifikasi')->nullable();
-            $table->dateTime('tanggal_verifikasi')->nullable();
+            $table->timestamp('tanggal_verifikasi')->nullable();
             $table->string('nama_lengkap')->nullable();
             $table->string('nisn')->unique();
             $table->foreignId('sekolah_id')->constrained('sekolah')->onDelete('set null');

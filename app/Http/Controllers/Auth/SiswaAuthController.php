@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use App\Models\Siswa;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Validator;
 
 class SiswaAuthController extends Controller
 {
@@ -70,5 +71,67 @@ class SiswaAuthController extends Controller
     {
         $request->session()->forget('siswa_id');
         return redirect('/login-siswa');
+    }
+
+    // Get all siswa
+    public function getAll()
+    {
+        return response()->json(Siswa::all());
+    }
+
+    // Get siswa by id
+    public function getById($id)
+    {
+        $siswa = Siswa::find($id);
+        if (!$siswa) {
+            return response()->json(['message' => 'Siswa tidak ditemukan'], 404);
+        }
+        return response()->json($siswa);
+    }
+
+    // Update data siswa
+    public function update(Request $request, $id)
+    {
+        $siswa = Siswa::find($id);
+        if (!$siswa) {
+            return response()->json(['message' => 'Siswa tidak ditemukan'], 404);
+        }
+        $data = $request->only(array_keys($request->all()));
+        $validator = Validator::make(array_merge($data, [
+            'foto_profil' => $request->file('foto_profil')
+        ]), [
+            'username' => 'sometimes|required|unique:siswa,username,' . $id,
+            'email' => 'sometimes|required|email|unique:siswa,email,' . $id,
+            'foto_profil' => 'sometimes|file|image|mimes:jpeg,png,jpg,gif|max:2048',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+        if (isset($data['password'])) {
+            $data['password'] = Hash::make($data['password']);
+        }
+        if (isset($data['status_verifikasi'])) {
+            $status = strtolower(trim($data['status_verifikasi']));
+            if ($status === 'sudah' || $status === '1' || $status === 'true') {
+                $data['status_verifikasi'] = 'sudah';
+            } elseif ($status === 'belum' || $status === '0' || $status === 'false') {
+                $data['status_verifikasi'] = 'belum';
+            } else {
+                $data['status_verifikasi'] = 'belum';
+            }
+        }
+        // Handle upload foto profil jika ada
+        if ($request->hasFile('foto_profil')) {
+            $path = $request->file('foto_profil')->store('siswa/foto', 'public');
+            $data['foto_profil'] = $path;
+        }
+
+        $siswa->update($data);
+        $siswa->refresh();
+        return response()->json([
+            'message' => 'Siswa berhasil diupdate',
+            'siswa' => $siswa,
+            'foto_profil_url' => isset($siswa->foto_profil) ? asset('storage/' . $siswa->foto_profil) : null,
+        ]);
     }
 }

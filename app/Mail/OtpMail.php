@@ -13,11 +13,11 @@ class OtpMail extends Mailable
     public $otp;
     public $nama;
 
-
-    public function __construct($otp, $nama)
+    public function __construct($otp, $nama = null)
     {
         $this->otp = $otp;
-        $this->nama = $nama;
+        // Pastikan selalu ada nama default agar template tidak kosong
+        $this->nama = $nama ?? 'Pengguna';
     }
 
     public function build()

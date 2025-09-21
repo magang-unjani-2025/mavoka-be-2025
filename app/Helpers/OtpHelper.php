@@ -12,8 +12,8 @@ class OtpHelper
         return random_int(100000, 999999);
     }
 
-    public static function sendOtp($email, $otp)
+    public static function sendOtp($email, $otp, $nama = null)
     {
-        Mail::to($email)->send(new OtpMail($otp));
+        Mail::to($email)->send(new OtpMail($otp, $nama));
     }
 }

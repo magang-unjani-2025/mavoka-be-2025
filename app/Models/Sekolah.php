@@ -21,6 +21,7 @@ class Sekolah extends Authenticatable implements JWTSubject
         'tanggal_verifikasi',
         'nama_sekolah',
         'web_sekolah',
+        'logo_sekolah',
         'npsn',
         'jurusan',
         'kontak',
@@ -34,10 +35,7 @@ class Sekolah extends Authenticatable implements JWTSubject
         return $this->hasMany(Siswa::class);
     }
 
-    public function jurusan()
-    {
-        return $this->hasMany(Jurusan::class);
-    }
+    // Relasi jurusan dihapus; kolom jurusan ada di tabel siswa sebagai string
 
 
     public function getJWTIdentifier()
