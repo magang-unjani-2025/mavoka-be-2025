@@ -62,7 +62,7 @@ jobs:
           gid: ${{ steps.get_user_info.outputs.gid }}
         run: |
           uid=$uid gid=$gid docker compose --file docker-compose-dev.yml build --no-cache
-          docker image save $CONTAINER_NAME-img:latest --output $CONTAINER_NAME-img.tar
+          docker image save $CONTAINER_NAME-img:latest | gzip > $CONTAINER_NAME-img.tar.gz
 
       - name: Copy Image with rsync over SSH
         uses: burnett01/rsync-deployments@7.0.2
@@ -73,7 +73,7 @@ jobs:
             --progress
             --no-compress
             --bwlimit 5120
-          path: $CONTAINER_NAME-img.tar
+          path: $CONTAINER_NAME-img.tar.gz
           remote_path: ${{ secrets.SCP_PATH }}
           remote_host: ${{ secrets.SSH_HOST }}
           remote_port: ${{ secrets.SSH_PORT }}
@@ -97,8 +97,9 @@ jobs:
             ${{ vars.ENV_DEV }}
             EOF
             docker compose --file docker-compose-dev.yml down --rmi all
-            docker image load --input ${{ env.CONTAINER_NAME }}-img.tar
+            docker image load --input ${{ env.CONTAINER_NAME }}-img.tar.gz
             uid=$uid gid=$gid docker compose --file docker-compose-dev.yml up --detach
+            rm ${{ env.CONTAINER_NAME }}-img.tar.gz
 
   composer-install:
     name: Install Dependencies and Transfer it
@@ -160,4 +161,3 @@ jobs:
           port: ${{ secrets.SSH_PORT }}
           script: |
             docker exec ${{ env.CONTAINER_NAME }} init.sh
-            docker restart ${{ env.CONTAINER_NAME }}
