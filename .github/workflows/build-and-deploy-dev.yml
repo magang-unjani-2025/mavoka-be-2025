@@ -92,13 +92,13 @@ jobs:
           port: ${{ secrets.SSH_PORT }}
           script: |
             cd ${{ secrets.SCP_PATH }}
-            git pull origin feature/cicd
+            git pull origin main
             cat << 'EOF' > .env.development
             ${{ vars.ENV_DEV }}
             EOF
-            docker compose --file docker-compose-dev.yml down --rmi all
             docker image load --input ${{ env.CONTAINER_NAME }}-img.tar.gz
-            uid=$uid gid=$gid docker compose --file docker-compose-dev.yml up --detach
+            uid=$uid gid=$gid docker compose --file docker-compose-dev.yml up --detach --force-recreate
+            docker image prune --all --force
             rm ${{ env.CONTAINER_NAME }}-img.tar.gz
 
   composer-install:
