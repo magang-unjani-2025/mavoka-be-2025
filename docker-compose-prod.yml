@@ -30,7 +30,7 @@ services:
       resources:
         limits:
           cpus: 1
-          memory: 1G
+          memory: 1.2G
     networks:
       mavoka:
         ipv4_address: 10.20.0.3
