@@ -130,8 +130,8 @@ jobs:
         if: steps.cache.outputs.cache-hit != 'true'
         with:
           version: '2.8.11'
-          php_version: '8.2'
-          php_extensions: gd pdo_mysql exif pcntl bcmath
+          php_version: '8.3'
+          php_extensions: gd pgsql pdo_pgsql exif pcntl bcmath zip
           dev: yes
           args: --no-interaction --prefer-dist --optimize-autoloader
 
