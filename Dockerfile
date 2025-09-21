@@ -22,6 +22,7 @@ RUN apt-get update && apt-get install -y \
     unzip \
     curl \
     git \
+    fd-find \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 RUN docker-php-ext-configure gd --with-freetype=/usr/include/ --with-jpeg=/usr/include/ \
