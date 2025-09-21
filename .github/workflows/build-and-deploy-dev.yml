@@ -67,7 +67,12 @@ jobs:
       - name: Copy Image with rsync over SSH
         uses: burnett01/rsync-deployments@7.0.2
         with:
-          switches: -avzr --delete
+          switches: >-
+            -avh
+            --timeout 60
+            --progress
+            --no-compress
+            --bwlimit 5120
           path: $CONTAINER_NAME-img.tar
           remote_path: ${{ secrets.SCP_PATH }}
           remote_host: ${{ secrets.SSH_HOST }}
@@ -133,7 +138,12 @@ jobs:
         uses: burnett01/rsync-deployments@7.0.2
         if: steps.cache.outputs.cache-hit != 'true'
         with:
-          switches: -avzr --delete
+          switches: >-
+            -avh
+            --timeout 60
+            --progress
+            --no-compress
+            --bwlimit 5120
           path: vendor
           remote_path: ${{ secrets.SCP_PATH }}
           remote_host: ${{ secrets.SSH_HOST }}
