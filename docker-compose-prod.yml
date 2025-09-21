@@ -1,0 +1,40 @@
+name: mavoka-be-2025-prod
+
+services:
+  app:
+    container_name: mavoka-be-2025-prod
+    image: mavoka-be-2025-prod-img
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        USERNAME: ${USER}
+        USER_UID: ${uid}
+        USER_GID: ${gid}
+    environment:
+      USERNAME: ${USER}
+      USER_UID: ${uid}
+      USER_GID: ${gid}
+    env_file:
+      - .env.development
+    volumes:
+      - .:/var/www/html
+      - ./php.ini:/usr/local/etc/php/php.ini
+      - /var/log/php-fpm:/var/log/php-fpm
+      - ./php-fpm-logging-prod.conf:/usr/local/etc/php-fpm.d/docker.conf
+    labels:
+      project: mavoka-be-2025
+      environment: prod
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: 1
+          memory: 1.2G
+    networks:
+      mavoka:
+        ipv4_address: 10.20.0.3
+
+networks:
+  mavoka:
+    external: true

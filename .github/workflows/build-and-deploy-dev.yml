@@ -1,0 +1,163 @@
+name: Build and Deploy Backend to Development
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  CONTAINER_NAME: mavoka-be-2025-dev
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Docker Setup Compose
+        uses: docker/setup-compose-action@v1
+
+      - name: Write .env File
+        run: |
+          cat << 'EOF' > .env.development
+          ${{ vars.ENV_DEV }}
+          EOF
+
+      - name: Get Server User ID
+        id: get_uid
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          capture_stdout: true
+          script: id -u
+
+      - name: Get Server Group ID
+        id: get_gid
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          capture_stdout: true
+          script: id -g
+
+      - name: Get Server User Information
+        id: get_user_info
+        run: |
+          USER_ID=$(echo '${{ steps.get_uid.outputs.stdout }}' | head -n 1)
+          GROUP_ID=$(echo '${{ steps.get_gid.outputs.stdout }}' | head -n 1)
+          echo "username=$USERNAME" >> $GITHUB_OUTPUT
+          echo "uid=$USER_ID" >> $GITHUB_OUTPUT
+          echo "gid=$GROUP_ID" >> $GITHUB_OUTPUT
+
+      - name: Build Container with Docker Compose
+        env:
+          uid: ${{ steps.get_user_info.outputs.uid }}
+          gid: ${{ steps.get_user_info.outputs.gid }}
+        run: |
+          uid=$uid gid=$gid docker compose --file docker-compose-dev.yml build --no-cache
+          docker image save $CONTAINER_NAME-img:latest | gzip > $CONTAINER_NAME-img.tar.gz
+
+      - name: Copy Image with rsync over SSH
+        uses: burnett01/rsync-deployments@7.0.2
+        with:
+          switches: >-
+            -avh
+            --timeout 60
+            --progress
+            --no-compress
+            --bwlimit 5120
+          path: $CONTAINER_NAME-img.tar.gz
+          remote_path: ${{ secrets.SCP_PATH }}
+          remote_host: ${{ secrets.SSH_HOST }}
+          remote_port: ${{ secrets.SSH_PORT }}
+          remote_user: ${{ secrets.SSH_USERNAME }}
+          remote_key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Deploy (Development) with SSH
+        uses: appleboy/ssh-action@v1
+        env:
+          uid: ${{ steps.get_user_info.outputs.uid }}
+          gid: ${{ steps.get_user_info.outputs.gid }}
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          script: |
+            cd ${{ secrets.SCP_PATH }}
+            git pull origin feature/cicd
+            cat << 'EOF' > .env.development
+            ${{ vars.ENV_DEV }}
+            EOF
+            docker compose --file docker-compose-dev.yml down --rmi all
+            docker image load --input ${{ env.CONTAINER_NAME }}-img.tar.gz
+            uid=$uid gid=$gid docker compose --file docker-compose-dev.yml up --detach
+            rm ${{ env.CONTAINER_NAME }}-img.tar.gz
+
+  composer-install:
+    name: Install Dependencies and Transfer it
+    needs: build-and-deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Get Composer Cache Directory
+        id: composer-cache
+        run: |
+          echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+
+      - name: Restore Composer Cache
+        uses: actions/cache@v4
+        id: cache
+        with:
+          path: |
+            ${{ steps.composer-cache.outputs.dir }}
+            vendor
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-composer-
+
+      - name: Composer (php-actions)
+        uses: php-actions/composer@v6
+        if: steps.cache.outputs.cache-hit != 'true'
+        with:
+          version: '2.8.11'
+          php_version: '8.3'
+          php_extensions: gd pgsql pdo_pgsql exif pcntl bcmath zip
+          dev: yes
+          args: --no-interaction --prefer-dist --optimize-autoloader
+
+      - name: Transfer Vendor with rsync over SSH
+        uses: burnett01/rsync-deployments@7.0.2
+        if: steps.cache.outputs.cache-hit != 'true'
+        with:
+          switches: >-
+            -avh
+            --timeout 60
+            --progress
+            --no-compress
+            --bwlimit 5120
+          path: vendor
+          remote_path: ${{ secrets.SCP_PATH }}
+          remote_host: ${{ secrets.SSH_HOST }}
+          remote_port: ${{ secrets.SSH_PORT }}
+          remote_user: ${{ secrets.SSH_USERNAME }}
+          remote_key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Run init script with SSH
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          script: |
+            docker exec ${{ env.CONTAINER_NAME }} init.sh
