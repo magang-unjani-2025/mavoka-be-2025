@@ -52,6 +52,8 @@ class UserController extends Controller
                 'kontak' => $akun->kontak,
                 'alamat' => $akun->alamat,
                 'email' => $akun->email,
+                'logo_sekolah' => $akun->logo_sekolah,
+                'logo_url' => method_exists($akun,'getLogoUrlAttribute') ? $akun->logo_url : null,
             ],
             'lpk' => [
                 'id' => $akun->id,

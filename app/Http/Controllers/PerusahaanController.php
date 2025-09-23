@@ -9,6 +9,32 @@ use Illuminate\Http\Request;
 
 class PerusahaanController extends Controller
 {
+    // Daftar semua perusahaan (public)
+    public function index(Request $request)
+    {
+        $q = $request->query('q');
+        $query = Perusahaan::query();
+        if ($q) {
+            $query->where(function($sub) use ($q){
+                $sub->where('nama_perusahaan','ILIKE','%'.$q.'%')
+                     ->orWhere('bidang_usaha','ILIKE','%'.$q.'%')
+                     ->orWhere('alamat','ILIKE','%'.$q.'%');
+            });
+        }
+        $companies = $query->orderBy('nama_perusahaan')->get();
+        $data = $companies->map(function($c){
+            return [
+                'id' => $c->id,
+                'nama_perusahaan' => $c->nama_perusahaan,
+                'alamat' => $c->alamat,
+                'logo_url' => $c->logo_perusahaan ? asset($c->logo_perusahaan) : null,
+                'deskripsi_usaha' => $c->deskripsi_usaha,
+                'bidang_usaha' => $c->bidang_usaha,
+                'web_perusahaan' => $c->web_perusahaan,
+            ];
+        });
+        return response()->json(['data' => $data]);
+    }
     // Daftar pelamar untuk semua lowongan milik perusahaan yang login
     public function listPelamar(Request $request)
     {
@@ -85,6 +111,15 @@ class PerusahaanController extends Controller
             return response()->json(['message' => 'Perusahaan tidak ditemukan'], 404);
         }
 
+        // Ambil daftar lowongan aktif (status = 'aktif') jika relasi tersedia
+        $lowonganAktif = $perusahaan->lowonganMagang()
+            ->where('status','aktif')
+            ->select('id','judul_lowongan','posisi','kuota','lokasi_penempatan','deadline_lamaran','status')
+            ->orderBy('deadline_lamaran')
+            ->get();
+
+        $totalLowonganAktif = $lowonganAktif->count();
+
         // Detail ringkas (public) tanpa field sensitif
         return response()->json([
             'success' => true,
@@ -99,6 +134,8 @@ class PerusahaanController extends Controller
                 'web_perusahaan' => $perusahaan->web_perusahaan,
                 'logo_perusahaan' => $perusahaan->logo_perusahaan,
                 'penanggung_jawab' => $perusahaan->penanggung_jawab,
+                'total_lowongan_aktif' => $totalLowonganAktif,
+                'lowongan_aktif' => $lowonganAktif,
             ]
         ]);
     }

@@ -30,13 +30,17 @@ class Sekolah extends Authenticatable implements JWTSubject
         'otp_expired_at',
     ];
 
+    protected $casts = [
+        'jurusan' => 'array', // simpan sebagai JSON array di DB
+    ];
+
+    // Otomatis ikut dalam serialisasi JSON
+    protected $appends = ['logo_url'];
+
     public function siswa()
     {
         return $this->hasMany(Siswa::class);
     }
-
-    // Relasi jurusan dihapus; kolom jurusan ada di tabel siswa sebagai string
-
 
     public function getJWTIdentifier()
     {
@@ -46,5 +50,21 @@ class Sekolah extends Authenticatable implements JWTSubject
     public function getJWTCustomClaims()
     {
         return [];
+    }
+
+    /**
+     * Accessor logo_url: menghasilkan URL penuh atau null jika tidak ada.
+     */
+    public function getLogoUrlAttribute(): ?string
+    {
+        if (empty($this->logo_sekolah)) {
+            return null;
+        }
+        // Jika sudah berupa URL absolut, kembalikan langsung
+        if (preg_match('~^https?://~i', $this->logo_sekolah)) {
+            return $this->logo_sekolah;
+        }
+        // Asumsikan path relatif ke public/ (karena disimpan oleh seeder)
+        return asset($this->logo_sekolah);
     }
 }

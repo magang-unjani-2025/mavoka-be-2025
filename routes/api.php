@@ -89,9 +89,11 @@ Route::prefix('lowongan')->group(function () {
 
 // =================== ROUTE PERUSAHAAN (PUBLIC DETAIL) ====================
 Route::get('/perusahaan/detail/{id}', [PerusahaanController::class, 'detail']);
+Route::get('/perusahaan/all', [PerusahaanController::class, 'index']);
 
 // =================== ROUTE LEMBAGA PELATIHAN (PUBLIC DETAIL) ====================
 Route::get('/lpk/detail/{id}', [LembagaPelatihanController::class, 'detail']);
+Route::get('/lpk/all', [LembagaPelatihanController::class, 'index']);
 
 // =================== ROUTE LOWONGAN MAGANG (PERUSAHAAN AUTH) ====================
 Route::prefix('lowongan')->middleware(['auth:perusahaan'])->group(function () {

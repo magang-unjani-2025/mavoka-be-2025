@@ -11,9 +11,8 @@ class PerusahaanSeeder extends Seeder
 {
     public function run(): void
     {
-        // Data statis dari gambar: username,email,password(status plain -> di-hash), status_verifikasi, tanggal_verifikasi,
-        // nama_perusahaan, bidang_usaha, web_perusahaan, deskripsi_usaha, alamat, kontak, penanggung_jawab
         $rows = [
+            // username, email, password, status, tanggal verif, nama perusahaan, bidang, web, deskripsi, alamat, kontak, penanggung jawab
             ['techindo01','info@techindo.com','pass1234','Terverifikasi','2024-08-12','PT Tech Indo Solutions','Teknologi','www.oceshakins.com','Penyedia solusi IT untuk perusahaan menengah dan besar','Jakarta Selatan, DKI Jakarta','81234567890','Andi Pratama'],
             ['sehcatare','contact@sehahub.id','sehat202','Terverifikasi','2024-09-01','SehatHub Indonesia','Kesehatan','www.oceshakins.com','Platform kesehatan digital & konsultasi dokter','Sleman, DIY','82197865432','Siti Rahmawati'],
             ['edusmart','support@edusmart.co.id','eduSmart','Terverifikasi','2024-09-01','EduSmart Nusantara','Pendidikan','www.oceshakins.com','Startup e-learning interaktif','Yogyakarta, DIY','8122341234','Budi Santoso'],
@@ -41,7 +40,16 @@ class PerusahaanSeeder extends Seeder
         ];
 
         $created=0; $updated=0; $now = now();
+        $stripWords = ['pt','cv','ud','pd','persero','tbk','indonesia','nusantara'];
         foreach ($rows as [$username,$email,$plainPassword,$status,$tglVerif,$namaPerusahaan,$bidang,$web,$deskripsi,$alamat,$kontak,$pic]) {
+            $base = strtolower($namaPerusahaan);
+            $base = preg_replace('/[^a-z0-9]+/i',' ', $base);
+            $tokens = array_filter(array_map('trim', explode(' ', $base)));
+            $filtered = [];
+            foreach ($tokens as $t) { if(!in_array($t,$stripWords)) { $filtered[] = $t; } }
+            if (!$filtered) { $filtered = [$username]; }
+            $slug = implode('_', $filtered);
+            $logoFile = $slug . '.png';
             $data = [
                 'username' => $username,
                 'email' => $email,
@@ -54,6 +62,7 @@ class PerusahaanSeeder extends Seeder
                 'deskripsi_usaha' => $deskripsi,
                 'alamat' => $alamat,
                 'kontak' => $kontak,
+                'logo_perusahaan' => 'logos/perusahaan/' . $logoFile,
                 'penanggung_jawab' => $pic,
                 'otp' => Str::random(6),
                 'otp_expired_at' => $now->copy()->addMinutes(10),

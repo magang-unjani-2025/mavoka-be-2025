@@ -94,14 +94,15 @@ class SiswaSeeder extends Seeder
             }
             $usedEmails[$email] = true;
 
-            // Normalisasi username -> slug dasar (tanpa spasi & karakter khusus)
+            // Normalisasi username: huruf kecil, gabungkan tanpa spasi/underscore
             $baseUsername = trim($usernameRaw) !== '' ? $usernameRaw : $nama;
-            $candidate = Str::slug($baseUsername, '_');
+            $slug = Str::slug($baseUsername, '-');
+            $candidate = strtolower(str_replace('-', '', $slug));
             if ($candidate === '') { $candidate = 'user'; }
             $original = $candidate;
             $suffix = 1;
             while (Siswa::where('username', $candidate)->exists()) {
-                $candidate = $original . '_' . $suffix++;
+                $candidate = $original . $suffix++;
             }
             $username = $candidate;
 
@@ -119,7 +120,7 @@ class SiswaSeeder extends Seeder
                 'nisn' => preg_replace('/[^0-9]/', '', $nisn),
                 'kelas' => (int) $kelas,
                 'jurusan' => $jurusan,
-                'tahun_ajaran' => $tahunAjaran, // simpan string penuh
+                'tahun_ajaran' => $tahunAjaran,
                 'username' => $username,
                 'password' => Hash::make($passwordPlain),
                 'jenis_kelamin' => $jenisKelamin,
@@ -167,9 +168,12 @@ class SiswaSeeder extends Seeder
             $n=1; while(isset($usedEmails[$local.$n.'@example.local'])) $n++; $candidate=$local.$n.'@example.local'; $usedEmails[$candidate]=true; return $candidate;
         };
         $generateUsername = function(string $base) use (&$usedUsernames) {
-            $u = Str::slug($base,'_'); if($u==='') $u='user';
+            $u = Str::slug($base,'-'); // contoh: andi-setiawan
+            $u = strtolower(str_replace('-', '', $u)); // => andisetiawan
+            if($u==='') $u='user';
             if(!isset($usedUsernames[$u])) { $usedUsernames[$u]=true; return $u; }
-            $n=1; $cand=$u.'_'.$n; while(isset($usedUsernames[$cand])) { $n++; $cand=$u.'_'.$n; } $usedUsernames[$cand]=true; return $cand;
+            $n=1; $cand=$u.$n; while(isset($usedUsernames[$cand])) { $n++; $cand=$u.$n; }
+            $usedUsernames[$cand]=true; return $cand;
         };
         $generateNisn = function() use (&$usedNisn) { do { $nisn=(string)mt_rand(100000000,999999999); } while(isset($usedNisn[$nisn])); $usedNisn[$nisn]=true; return $nisn; };
 
