@@ -33,6 +33,8 @@ class LembagaPelatihan extends Authenticatable implements JWTSubject
         'otp_expired_at',
     ];
 
+    protected $appends = ['logo_url'];
+
     public function getJWTIdentifier() {
         return $this->getKey();
     }
@@ -45,5 +47,25 @@ class LembagaPelatihan extends Authenticatable implements JWTSubject
     public function pelatihan()
     {
         return $this->hasMany(Pelatihan::class, 'lembaga_id');
+    }
+
+    public function getLogoUrlAttribute()
+    {
+        if (!$this->logo_lembaga) return null;
+        $path = $this->logo_lembaga;
+        // Absolute URL langsung dikembalikan
+        if (preg_match('/^https?:\/\//i', $path)) {
+            return $path;
+        }
+        // Backward compatibility: ganti prefix jika file baru tersedia
+        if (str_starts_with($path, 'logos/lembaga/')) {
+            $candidate = str_replace('logos/lembaga/', 'logos/lembaga-pelatihan/', $path);
+            $oldFull = public_path($path);
+            $newFull = public_path($candidate);
+            if (!file_exists($oldFull) && file_exists($newFull)) {
+                $path = $candidate;
+            }
+        }
+        return asset($path);
     }
 }

@@ -11,9 +11,7 @@ class LembagaSeeder extends Seeder
 {
     public function run(): void
     {
-        // Data statis dari gambar: username,email,password,status_verifikasi,tanggal_verifikasi,nama_lembaga,
-        // bidang_pelatihan, deskripsi_lembaga, web_lembaga, alamat, kontak, status_akreditasi
-    $rows = [
+        $rows = [
             ['nexatech_academy','info@nexatech.id','nexa1234','Terverifikasi','2024-03-15','LPK NexaTech Academy','Web Development, Data Science, Cloud Computing','LPK NexaTech Academy hadir untuk mengembangkan talenta digital masa depan','https://nexatech.id','Jl. Dipatiukur N  Azure','872349865733','A'],
             ['brightskill_center','contact@brightskill.com','bright!23','Terverifikasi','2024-05-20','LPK BrightSkill Center','Komunikasi Efektif, Public Speaking, Leadership','BrightSkill Center berfokus pada pengembangan soft-skill profesional','https://brightskill.com','Jl. Ahmad Yani 327879456712','A'],
             ['unigama_biz','admin@unigama-biz.com','unigama55','Terverifikasi','2024-05-22','LPK Unigama Business Institute','Akuntansi, Administrasi Perkantoran, Manajemen','Unigama Business Institute menawarkan program bisnis praktis','https://unigama-biz.com','Jl. Kaliurang K 878345671230','B'],
@@ -42,9 +40,6 @@ class LembagaSeeder extends Seeder
 
         $created=0; $updated=0; $now=now();
         foreach ($rows as $row) {
-            // Dua format yang didukung:
-            // 12 kolom: username,email,password,status_verifikasi,tanggal_verifikasi,nama_lembaga,bidang,deskripsi,web,alamat,kontak,akreditasi
-            // 11 kolom: (alamat berisi kontak di akhir) -> kita ekstrak kontak numeric terakhir
             $colCount = count($row);
             if (!in_array($colCount,[11,12])) {
                 $this->command?->warn('Baris lembaga tidak valid (kolom != 11/12), dilewati: '.json_encode($row));
@@ -71,6 +66,8 @@ class LembagaSeeder extends Seeder
                     $alamat = $alamatRaw; $kontak='-';
                 }
             }
+            // Set logo otomatis berdasarkan username
+            $logo = $username . '.png';
             $data = [
                 'username' => $username,
                 'email' => $email,
@@ -83,6 +80,8 @@ class LembagaSeeder extends Seeder
                 'web_lembaga' => $web,
                 'alamat' => $alamat,
                 'kontak' => $kontak,
+                // Sesuaikan folder ke 'lembaga-pelatihan' (folder aktual di public/logos)
+                'logo_lembaga' => 'logos/lembaga-pelatihan/' . $logo,
                 'status_akreditasi' => $akredit,
                 'otp' => Str::random(6),
                 'otp_expired_at' => $now->copy()->addMinutes(10),

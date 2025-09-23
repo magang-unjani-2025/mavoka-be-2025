@@ -19,7 +19,26 @@ class LowonganMagangController extends Controller
     public function listAll()
     {
         $lowongans = LowonganMagang::with('perusahaan')->get();
-        return response()->json($lowongans);
+        $data = $lowongans->map(function($l){
+            $p = $l->perusahaan;
+            return [
+                'id' => $l->id,
+                'judul_lowongan' => $l->judul_lowongan,
+                'posisi' => $l->posisi,
+                'kuota' => $l->kuota,
+                'lokasi_penempatan' => $l->lokasi_penempatan,
+                'deadline_lamaran' => $l->deadline_lamaran,
+                'status' => $l->status,
+                'perusahaan' => $p ? [
+                    'id' => $p->id,
+                    'nama_perusahaan' => $p->nama_perusahaan,
+                    'logo_perusahaan' => $p->logo_perusahaan, // original value (relative maybe)
+                    'logo_url' => $p->logo_perusahaan ? asset($p->logo_perusahaan) : null,
+                    'alamat' => $p->alamat,
+                ] : null,
+            ];
+        });
+        return response()->json(['data' => $data]);
     }
 
     public function detail($id)

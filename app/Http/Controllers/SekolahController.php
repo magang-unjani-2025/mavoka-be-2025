@@ -37,10 +37,30 @@ class SekolahController extends Controller
                 'email' => $sekolah->email,
                 'npsn' => $sekolah->npsn,
                 'logo_sekolah' => $sekolah->logo_sekolah,
+                'logo_url' => $sekolah->logo_url,
                 'kontak' => $sekolah->kontak,
                 'alamat' => $sekolah->alamat,
-                // jurusan kini dikelola di entitas siswa (string per siswa)
+                'jurusan' => is_array($sekolah->jurusan) ? $sekolah->jurusan : (empty($sekolah->jurusan) ? [] : [$sekolah->jurusan]),
             ]
+        ]);
+    }
+
+    // Baru: ambil daftar jurusan (array) langsung dari kolom json sekolah
+    public function getJurusanBySekolah($sekolah_id)
+    {
+        $sekolah = Sekolah::find($sekolah_id);
+        if (!$sekolah) {
+            return response()->json(['message' => 'Sekolah tidak ditemukan'], 404);
+        }
+        $jurusan = $sekolah->jurusan;
+        if (!is_array($jurusan)) {
+            $jurusan = empty($jurusan) ? [] : [$jurusan];
+        }
+        return response()->json([
+            'sekolah_id' => $sekolah->id,
+            'nama_sekolah' => $sekolah->nama_sekolah,
+            'jurusan' => $jurusan,
+            'count' => count($jurusan),
         ]);
     }
 

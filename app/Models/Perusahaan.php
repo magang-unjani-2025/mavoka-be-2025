@@ -34,6 +34,20 @@ class Perusahaan extends Authenticatable implements JWTSubject
         'password',
     ];
 
+    protected $appends = ['logo_url'];
+
+    public function getLogoUrlAttribute()
+    {
+        if (!$this->logo_perusahaan) {
+            return null;
+        }
+        // Jika path sudah absolute url
+        if (preg_match('/^https?:\/\//i', $this->logo_perusahaan)) {
+            return $this->logo_perusahaan;
+        }
+        return asset($this->logo_perusahaan);
+    }
+
     public function lowonganMagang()
 {
     return $this->hasMany(LowonganMagang::class);
