@@ -1,9 +1,6 @@
-name: mavoka-be-2025-prod
-
 services:
-  app:
-    container_name: mavoka-be-2025-prod
-    image: mavoka-be-2025-prod-img
+  backend:
+    image: mavoka-be-2025-prod-img:${GITHUB_SHA}
     build:
       context: .
       dockerfile: Dockerfile
@@ -27,14 +24,28 @@ services:
       environment: prod
     restart: unless-stopped
     deploy:
+      mode: replicated
+      endpoint_mode: vip
       resources:
         limits:
-          cpus: 1
-          memory: 1.2G
+          cpus: "1"
+          memory: "1.2G"
+      update_config:
+        parallelism: 1
+        delay: 5s
+        failure_action: rollback
+        order: start-first
+      rollback_config:
+        parallelism: 1
+        delay: 5s
+        failure_action: pause
+        order: start-first
     networks:
-      mavoka:
-        ipv4_address: 10.20.0.3
+      - core
+      - mavoka
 
 networks:
+  core:
+    external: true
   mavoka:
     external: true

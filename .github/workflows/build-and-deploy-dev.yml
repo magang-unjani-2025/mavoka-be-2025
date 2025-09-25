@@ -66,7 +66,7 @@ jobs:
           gid: ${{ steps.get_user_info.outputs.gid }}
         run: |
           uid=$uid gid=$gid docker compose --file docker-compose-dev.yml build --no-cache
-          docker image save $CONTAINER_NAME-img:latest | gzip > $CONTAINER_NAME-img.tar.gz
+          docker image save $CONTAINER_NAME-img:${{ github.sha }} | gzip > $CONTAINER_NAME-img.tar.gz
 
       - name: Copy Image with rsync over SSH
         uses: burnett01/rsync-deployments@7.0.2
@@ -96,13 +96,13 @@ jobs:
           port: ${{ secrets.SSH_PORT }}
           script: |
             cd ${{ secrets.SCP_PATH }}
+            git stash
             git pull origin main
             cat << 'EOF' > .env.development
             ${{ vars.ENV_DEV }}
             EOF
             docker image load --input ${{ env.CONTAINER_NAME }}-img.tar.gz
-            uid=$uid gid=$gid docker compose --file docker-compose-dev.yml up --detach --force-recreate
-            docker image prune --all --force
+            docker service update --image ${{ env.CONTAINER_NAME }}-img:${{ github.sha }} mavoka_development_backend
             rm ${{ env.CONTAINER_NAME }}-img.tar.gz
 
   composer-install:
@@ -164,4 +164,11 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: ${{ secrets.SSH_PORT }}
           script: |
-            docker exec ${{ env.CONTAINER_NAME }} init.sh
+            CONTAINER_IDS=$(docker ps --quiet \
+              --filter "label=com.docker.swarm.service.name=mavoka_development_backend" \
+              --filter "status=running")
+
+            while IFS= read -r line; do
+              docker exec "$line" init.sh
+              sleep 1
+            done <<< "$CONTAINER_IDS"

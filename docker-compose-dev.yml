@@ -1,9 +1,6 @@
-name: mavoka-be-2025-dev
-
 services:
-  app:
-    container_name: mavoka-be-2025-dev
-    image: mavoka-be-2025-dev-img
+  backend:
+    image: mavoka-be-2025-dev-img:${GITHUB_SHA}
     build:
       context: .
       dockerfile: Dockerfile
@@ -27,14 +24,28 @@ services:
       environment: dev
     restart: unless-stopped
     deploy:
+      mode: replicated
+      endpoint_mode: vip
       resources:
         limits:
-          cpus: 0.2
-          memory: 800M
+          cpus: "0.2"
+          memory: "800M"
+      update_config:
+        parallelism: 1
+        delay: 5s
+        failure_action: rollback
+        order: start-first
+      rollback_config:
+        parallelism: 1
+        delay: 5s
+        failure_action: pause
+        order: start-first
     networks:
-      mavoka_dev:
-        ipv4_address: 10.30.0.3
+      - core
+      - mavoka_dev
 
 networks:
+  core:
+    external: true
   mavoka_dev:
     external: true
