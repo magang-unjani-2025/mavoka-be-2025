@@ -23,12 +23,15 @@ Route::prefix('user')->group(function () {
     Route::post('/login/{role}', [LoginController::class, 'login']);
     Route::post('/logout', [LoginController::class, 'logout']);
     Route::post('/register/siswa', [AuthController::class, 'registerSiswa']);
-    Route::post('/siswa/lengkapi-registrasi', [AuthController::class, 'siswaLengkapiRegistrasi']);
+    Route::post('/siswa/lengkapi-registrasi', [AuthController::class, 'siswaLeng    kapiRegistrasi']);
     Route::post('/register/sekolah', [AuthController::class, 'registerSekolah']);
     Route::post('/register/perusahaan', [AuthController::class, 'registerPerusahaan']);
     Route::post('/register/lpk', [AuthController::class, 'registerLembagaPelatihan']);
     Route::post('/verify-otp/{role}', [AuthController::class, 'verifyOTP']);
     Route::post('/resend-otp/{role}', [AuthController::class, 'resendOtp']);
+
+    // Verify current password for authenticated user (used before allowing password change)
+    Route::middleware('auth:siswa,sekolah,perusahaan,lpk')->post('/verify-password/{role}', [AuthController::class, 'verifyPassword']);
 
     // Update akun berbagai role (PUT/PATCH/POST override)
     Route::middleware('auth:siswa,sekolah,perusahaan,lpk')
@@ -70,6 +73,15 @@ Route::prefix('siswa')->group(function () {
 
 // =================== ROUTE VERIFIKASI (ADMIN ONLY) ====================
 Route::middleware('auth:admin')->put('/verifikasi/{role}/{id}', [VerifikasiController::class, 'verifikasiAkun']);
+// Admin listing for verifikasi (used by admin UI)
+Route::middleware('auth:admin')->get('/admin/verifikasi', [VerifikasiController::class, 'index']);
+
+// Local-only debug route: allows calling the same controller index without auth
+// This helps debugging in local dev when admin auth isn't present. It will only
+// be registered when the app environment is local or app.debug is true.
+if (app()->environment('local') || config('app.debug')) {
+    Route::get('/admin/verifikasi-debug', [VerifikasiController::class, 'index']);
+}
 
 // =================== ROUTE STATISTIK (AGGREGATION) ====================
 Route::prefix('statistik')->group(function () {
@@ -109,6 +121,7 @@ Route::middleware('auth:perusahaan')->get('/perusahaan/pelamar', [PerusahaanCont
 
 // ==================== ROUTE PELAMAR (LAMARAN) ====================
 Route::prefix('pelamar')->group(function () {
+    Route::middleware('auth:siswa')->get('/', [PelamarController::class, 'mine']);
     Route::middleware('auth:siswa')->post('/', [PelamarController::class, 'store']);
     Route::middleware('auth:perusahaan,admin')->put('/{id}/status', [PelamarController::class, 'updateStatus']);
     Route::middleware('auth:siswa')->post('/{id}/respond-penawaran', [PelamarController::class, 'respondPenawaran']);

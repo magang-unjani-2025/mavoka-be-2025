@@ -24,6 +24,7 @@ class Perusahaan extends Authenticatable implements JWTSubject
         'alamat',
         'kontak',
         'logo_perusahaan',
+        'tanda_tangan',
         'penanggung_jawab',
         'web_perusahaan',
         'otp',
@@ -35,6 +36,17 @@ class Perusahaan extends Authenticatable implements JWTSubject
     ];
 
     protected $appends = ['logo_url'];
+
+    public function getTandaTanganUrlAttribute()
+    {
+        if (!$this->tanda_tangan) {
+            return null;
+        }
+        if (preg_match('/^https?:\/\//i', $this->tanda_tangan)) {
+            return $this->tanda_tangan;
+        }
+        return asset($this->tanda_tangan);
+    }
 
     public function getLogoUrlAttribute()
     {
@@ -49,9 +61,9 @@ class Perusahaan extends Authenticatable implements JWTSubject
     }
 
     public function lowonganMagang()
-{
-    return $this->hasMany(LowonganMagang::class);
-}
+    {
+        return $this->hasMany(LowonganMagang::class);
+    }
 
     public function getJWTIdentifier()
     {

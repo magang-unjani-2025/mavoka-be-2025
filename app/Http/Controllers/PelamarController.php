@@ -435,4 +435,42 @@ class PelamarController extends Controller
             ]
         ]);
     }
+
+    // Endpoint siswa: daftar lamaran milik siswa yang login
+    public function mine(Request $request)
+    {
+        $siswa = Auth::guard('siswa')->user();
+        if (!$siswa) {
+            return response()->json([
+                'status' => 'unauthorized',
+                'message' => 'Silakan login sebagai siswa.'
+            ], 401);
+        }
+
+        // Ambil semua lamaran untuk siswa ini
+        $pelamars = Pelamar::where('siswa_id', $siswa->id)
+            ->orderBy('tanggal_lamaran', 'desc')
+            ->get()
+            ->map(function ($p) {
+                return [
+                    'id' => $p->id,
+                    'siswa_id' => $p->siswa_id,
+                    'lowongan_id' => $p->lowongan_id,
+                    'cv_url' => $p->cv ? asset('storage/' . $p->cv) : null,
+                    'transkrip_url' => $p->transkrip ? asset('storage/' . $p->transkrip) : null,
+                    'tanggal_lamaran' => $p->tanggal_lamaran,
+                    'status_lamaran' => $p->status_lamaran,
+                    // include some lowongan / perusahaan summary if relation exists
+                    'posisi' => optional($p->lowongan)->posisi ?? null,
+                    'perusahaan' => optional($p->lowongan)->perusahaan_nama ?? null,
+                    'email' => optional($p->siswa)->email ?? null,
+                    'nisn' => optional($p->siswa)->nisn ?? null,
+                ];
+            });
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $pelamars,
+        ]);
+    }
 }
