@@ -31,6 +31,7 @@ class SekolahController extends Controller
         return response()->json([
             'success' => true,
             'data' => [
+                'username' => $sekolah->username ?? null,
                 'id' => $sekolah->id,
                 'nama_sekolah' => $sekolah->nama_sekolah,
                 'web_sekolah' => $sekolah->web_sekolah,

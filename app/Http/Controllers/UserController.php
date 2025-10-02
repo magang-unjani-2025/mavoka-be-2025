@@ -40,12 +40,16 @@ class UserController extends Controller
                 'email' => $akun->email,
                 'web_perusahaan' => $akun->web_perusahaan,
                 'logo_perusahaan' => $akun->logo_perusahaan,
+                'logo_url' => method_exists($akun,'getLogoUrlAttribute') ? $akun->logo_url : null,
+                'tanda_tangan' => $akun->tanda_tangan ?? null,
+                'tanda_tangan_url' => method_exists($akun,'getTandaTanganUrlAttribute') ? $akun->tanda_tangan_url : null,
                 'divisi_penempatan' => $akun->divisi_penempatan,
                 'penanggung_jawab' => $akun->penanggung_jawab,
             ],
             'sekolah' => [
                 'id' => $akun->id,
                 'nama_sekolah' => $akun->nama_sekolah,
+                'username' => $akun->username ?? null,
                 'web_sekolah' => $akun->web_sekolah,
                 'npsn' => $akun->npsn,
                 'jurusan' => $akun->jurusan,
@@ -57,6 +61,8 @@ class UserController extends Controller
             ],
             'lpk' => [
                 'id' => $akun->id,
+                // Pastikan username ikut dikirim agar FE bisa langsung menampilkan tanpa heuristik
+                'username' => $akun->username ?? null,
                 'nama_lembaga' => $akun->nama_lembaga,
                 'web_lembaga' => $akun->web_lembaga,
                 'bidang_pelatihan' => $akun->bidang_pelatihan,
@@ -65,6 +71,7 @@ class UserController extends Controller
                 'kontak' => $akun->kontak,
                 'email' => $akun->email,
                 'logo_lembaga' => $akun->logo_lembaga,
+                'logo_url' => method_exists($akun,'getLogoUrlAttribute') ? $akun->logo_url : null,
                 'status_akreditasi' => $akun->status_akreditasi,
                 'dokumen_akreditasi' => $akun->dokumen_akreditasi,
             ],

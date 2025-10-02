@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Auth;
 use Tymon\JWTAuth\Facades\JWTAuth;
 use App\Models\Admin;
 use App\Models\Siswa;
@@ -40,13 +41,18 @@ class LoginController extends Controller
             return response()->json(['message' => 'Username atau password salah.'], 401);
         }
 
-        if ($role !== 'siswa' && isset($user->status_verifikasi) && $user->status_verifikasi !== 'Terverifikasi') {
-            return response()->json(['message' => 'Akun belum diverifikasi.'], 403);
+        // If the model has a verification status field, require it to be 'Terverifikasi'
+        if (isset($user->status_verifikasi) && $user->status_verifikasi !== 'Terverifikasi') {
+            return response()->json([
+                'message' => 'Akun belum diverifikasi.',
+                'status_verifikasi' => $user->status_verifikasi,
+            ], 403);
         }
 
-        $token = auth($role)->attempt([
+        // Use the requested guard to attempt login and create a token
+        $token = Auth::guard($role)->attempt([
             'username' => $request->username,
-            'password' => $request->password
+            'password' => $request->password,
         ]);
 
         if (!$token) {
@@ -56,7 +62,7 @@ class LoginController extends Controller
         return response()->json([
             'message' => 'Login berhasil.',
             'token' => $token,
-            'user' => $user
+            'user' => $user,
         ]);
     }
 
