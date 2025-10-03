@@ -447,11 +447,14 @@ class PelamarController extends Controller
             ], 401);
         }
 
-        // Ambil semua lamaran untuk siswa ini
-        $pelamars = Pelamar::where('siswa_id', $siswa->id)
+        // Ambil semua lamaran untuk siswa ini + eager load relasi lowongan & perusahaan
+        $pelamars = Pelamar::with(['lowongan.perusahaan', 'siswa'])
+            ->where('siswa_id', $siswa->id)
             ->orderBy('tanggal_lamaran', 'desc')
             ->get()
             ->map(function ($p) {
+                $lowongan = $p->lowongan; // LowonganMagang atau null
+                $perusahaan = $lowongan?->perusahaan; // Perusahaan atau null
                 return [
                     'id' => $p->id,
                     'siswa_id' => $p->siswa_id,
@@ -460,9 +463,14 @@ class PelamarController extends Controller
                     'transkrip_url' => $p->transkrip ? asset('storage/' . $p->transkrip) : null,
                     'tanggal_lamaran' => $p->tanggal_lamaran,
                     'status_lamaran' => $p->status_lamaran,
-                    // include some lowongan / perusahaan summary if relation exists
-                    'posisi' => optional($p->lowongan)->posisi ?? null,
-                    'perusahaan' => optional($p->lowongan)->perusahaan_nama ?? null,
+                    // Ringkasan lowongan
+                    'posisi' => $lowongan->posisi ?? null,
+                    'penempatan' => $lowongan->lokasi_penempatan ?? null,
+                    // Nama perusahaan diambil dari relasi perusahaan (fallback ke null kalau tidak ada)
+                    'perusahaan' => $perusahaan->nama_perusahaan ?? null,
+                    // Tambahkan juga alias "nama_perusahaan" agar fleksibel di frontend
+                    'nama_perusahaan' => $perusahaan->nama_perusahaan ?? null,
+                    // Informasi siswa tambahan
                     'email' => optional($p->siswa)->email ?? null,
                     'nisn' => optional($p->siswa)->nisn ?? null,
                 ];
